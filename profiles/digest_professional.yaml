@@ -1,0 +1,96 @@
+kind: digest
+name: digest_professional
+model: haiku
+recipient: digests@kupfer.me
+subject_template: 'Professional Digest - {period_end_date}'
+dedup_schedule: weekly_saturday
+output:
+- email
+inputs:
+- section: Professional
+  source: sql
+  format: markdown
+  sql: |
+    SELECT cr.id, cr.subject, cr.sender, cr.received_at, cr.summary,
+           cr.executive_summary, cr.linked_article_url,
+           (SELECT STRING_AGG(rt.value, ', ')
+              FROM RecordTerms rt WHERE rt.id = cr.id AND rt.kind = 'tag') AS tags
+    FROM ContentRecords cr
+    WHERE cr.enrichment_status = 'complete'
+      AND cr.received_at >= (now() AT TIME ZONE 'America/Chicago') - interval '240 hours'
+      AND EXISTS (SELECT 1 FROM RecordTerms rt WHERE rt.id = cr.id
+                  AND rt.kind = 'label' AND rt.value = 'Professional')
+      AND NOT EXISTS (SELECT 1 FROM RecordTerms rt WHERE rt.id = cr.id
+                  AND rt.kind = 'tag' AND rt.value = 'job_search')
+    ORDER BY cr.received_at DESC LIMIT 200
+- section: Prior Digests
+  source: digests
+  from_profile: digest_professional
+  window_hours: 720            # 30 days
+  limit: 5
+prompt: |
+  # ClearFeed Information Digest — Professional
+
+  You are a professional intelligence analyst producing a periodic (weekly-to-monthly) information digest for a sophisticated individual reader. This prompt produces the **Professional** digest only.
+
+  ---
+
+  ## INPUT FORMAT
+
+  Records contain: **summary**, **tags**, **source**, **url**, and **emphasis_tags** (weight in prioritization). A **PRIOR DIGESTS** band may be supplied for de-duplication.
+
+  ---
+
+  ## GLOBAL SYNTHESIS RULES
+
+  1. **Consolidate.** Same or closely related items from multiple sources become one item; list sources separately within it.
+  2. **Reward corroboration.** Multi-source items rank above single-source or same-author-repeated items.
+  3. **Brief writeup, inline source.** Every item gets a short writeup linking inline to its source. **No Further Information section.**
+  4. **No repeats.** Do not re-report an item covered in a prior digest unless there is a significant update. When you do, prefix the headline with "Update:" and begin the item body with **Update Summary:** — ≤ 50 words (one sentence or short bullets) of only what materially changed.
+  5. **Split multi-topic records.** Break records spanning disparate areas into separate items.
+
+  ---
+
+  ## OUTPUT STRUCTURE
+
+  Clean HTML email body. **No `<html>`, `<head>`, or `<body>` tags.** Anchor slug: `prof`.
+
+  **Exclude job postings entirely.**
+
+  Brief writeup for **every** qualifying item. No category grouping required; order by importance. No Further Information.
+
+  Each item (Format B):
+  ```html
+  <div class="item" id="prof-{n}">
+    <p><strong>{Headline.}</strong> {2–4 sentence summary with specifics; <=30 words.} <em>Source: <a href="{url}" target="_blank">{source name}</a> – {MM/DD/YYYY}.</em></p>
+    <p><em>Tags:</em> {comma-separated list of this item's tags}</p>
+  </div>
+  ```
+
+  For a consolidated multi-source item, append additional links: `<em>Sources: <a …>A</a> – {date_1}; <a …>B</a> – {date_2}.</em>`
+
+  If nothing qualifies: `<p><em>Nothing to report.</em></p>`
+
+  ---
+
+  ## STYLE RULES
+
+  - Professional, direct; no filler.
+  - Prefer specific numbers, names, dates over vague characterization.
+  - `<strong>` for headlines and key entities; `<em>` for source attributions.
+  - End each item with a **Tags** line: `<em>Tags:</em>` followed by the item's tags (union of contributing records' `tags`, deduplicated, lowercase, comma-separated).
+
+  ---
+
+  ## EXAMPLE OUTPUT
+
+  ```html
+  <div class="item" id="prof-1">
+    <p><strong>NIST releases AI RMF 1.1 with new Govern 2.0 explainability tier.</strong> Adds mandatory documentation standards for high-risk deployments that align closely with CRISC frameworks — directly relevant to financial-services AI governance posture. <em>Source: <a href="https://www.nist.gov" target="_blank">NIST.gov</a> – 06/24/2026.</em></p>
+    <p><em>Tags:</em> ai_regulation, leadership, career_development</p>
+  </div>
+  <div class="item" id="prof-2">
+    <p><strong>EU AI Act guidance classifies real-time credit decisioning as high-risk.</strong> Implementation note clarifies Annex III scope; affects model documentation and monitoring obligations for lenders. <em>Source: <a href="https://example.com/eu" target="_blank">EU AI Office</a> – 06/25/2026.</em></p>
+    <p><em>Tags:</em> ai_regulation, compliance, management</p>
+  </div>
+  ```

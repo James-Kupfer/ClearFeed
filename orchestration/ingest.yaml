@@ -1,0 +1,18 @@
+# ClearFeed master ingest orchestration config.
+#
+# The orchestrator (src/ingest_orchestrator.py) runs one full ingest cycle:
+#   Stage 0: Gmail token expiration check (always runs)
+#   Stage 1: Gmail ingest — controlled by gmail_ingest below
+#   Stage 2: Post-ingest action profiles — controlled by post_ingest_actions below
+#
+# To disable a step temporarily, set the flag to false or comment out the profile.
+# Action profiles handle their own deduplication via ActionRuns.
+
+gmail_ingest: true
+
+post_ingest_actions:
+  - profiles/task_connection.yaml
+  - profiles/task_investment.yaml
+  - profiles/task_personal.yaml
+  - profiles/task_professional.yaml
+  - profiles/task_rights_offering.yaml

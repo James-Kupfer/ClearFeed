@@ -1,0 +1,101 @@
+kind: action
+name: task_professional
+target: todoist
+model: haiku
+
+# --- Trigger ---
+# Scans Professional records tagged actionable in the last window_hours that
+# haven't been actioned by this profile yet. Each matching record is processed
+# independently — one prompt call, one task.
+trigger:
+  sql: |
+    SELECT cr.id, cr.sender, cr.subject, cr.executive_summary,
+           cr.summary, cr.linked_article_url
+    FROM ContentRecords cr
+    WHERE cr.enrichment_status = 'complete'
+      AND cr.processed_at >= (now() AT TIME ZONE 'America/Chicago') - interval '336 hours'
+      AND {{dedup}}
+      AND EXISTS (SELECT 1 FROM RecordTerms rt WHERE rt.id = cr.id
+                  AND rt.kind = 'label' AND rt.value = 'Professional')
+      AND EXISTS (SELECT 1 FROM RecordTerms rt2 WHERE rt2.id = cr.id
+                  AND rt2.kind = 'tag' AND rt2.value = 'actionable')
+    ORDER BY cr.processed_at DESC LIMIT 50
+
+# --- Todoist task mapping ---
+# {placeholders} are resolved from: inputs above + keys returned by the prompt JSON.
+# prompt.priority (int 1-4) overrides the static priority here if present.
+# Skip task creation when prompt returns is_not_actionable: true (LLM safety check).
+todoist:
+  project: "Professional"
+  section: null
+  skip_if: "is_not_actionable"
+  priority: 3
+  labels:
+    - clearfeed
+  forward_due_date: 0
+  content: "{action}"
+  description: |
+    Added: {today}
+
+    {description}
+
+    ---
+    **Source:** {sender}
+    **Subject:** {subject}
+    **Link:** {linked_article_url}
+
+# --- Prompt ---
+# Interpolated with {input} placeholders before the LLM call.
+# Must return strict JSON — keys become available as {placeholders} in the
+# todoist content/description templates above.
+#
+# Required keys: is_not_actionable, action, description, priority
+prompt: |
+  You are triaging actionable professional intelligence on behalf of a sophisticated
+  individual. Each record you receive is a single professional item that has
+  been pre-classified as actionable. Analyze the record and return STRICT JSON with
+  no surrounding text or markdown fences.
+
+  STEP 1 — SKIP CHECK
+  Set is_not_actionable: true and return immediately with only that key if the
+  record does not actually require a specific near-term decision or action. Examples:
+  purely informational content, general professional updates with no decision required,
+  job postings or recruitment outreach (always exclude these), connection requests,
+  already-expired opportunities, or records where the "actionable" tag appears to
+  be a misclassification.
+
+  STEP 2 — EXTRACT THE ACTION
+  Identify the single most important decision or action this record demands.
+  Express it as a concise imperative phrase suitable as a Todoist task title
+  (e.g., "Respond to Vertex Partners NDA by Thursday",
+  "Register for Data & AI Summit before early-bird expires",
+  "Prepare presentation for client review by Monday").
+
+  STEP 3 — WRITE THE DESCRIPTION
+  Write a structured Markdown description covering:
+  - The specific action required and why it is time-sensitive (if applicable)
+  - Key details: names, dates, deadlines, specific requirements
+  - Relevant context: what triggered this action, who is involved, implications
+  - Key risks or blockers
+  - Recommended next step (one concrete sentence)
+
+  STEP 4 — ASSIGN PRIORITY
+  Rate urgency 1–4 where 4 = act immediately (today or urgent), 3 = act
+  within 24–48 hours, 2 = act within the week, 1 = monitor / low urgency.
+  Base on time-sensitivity of the deadline, complexity, and downstream impact.
+
+  STEP 5 — RETURN JSON
+
+  Required JSON keys:
+    "is_not_actionable"  — boolean. True only if this record does not warrant a
+                           task (see Step 1). If true, return only this key.
+    "action"             — concise imperative task title (≤ 12 words).
+    "description"        — structured Markdown per Step 3. Use bold for names,
+                           deadlines, and key details. No bullet points — prose only.
+    "priority"           — integer 1–4 per Step 4.
+
+  Sender: {sender}
+  Subject: {subject}
+  Executive Summary: {executive_summary}
+  Summary: {summary}
+  Link: {linked_article_url}
