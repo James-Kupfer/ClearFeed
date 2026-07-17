@@ -62,7 +62,10 @@ writes DigestRuns   target handler;                                   │
 | `llm_client.py` | Anthropic wrapper + model routing | `LLMClient.call`, `.call_json` (routes via `LLM_ROUTING`) | ingest, dispatch, action |
 | `utils.py` | Cross-cutting helpers | **`read_yaml_profile`** (single YAML-parse site), `setup_logging`, `retry`, `normalize_tag`, `now_cst`, summarize/classify helpers | everything |
 | `ingest_gmail.py` | Stage 1 | `run_ingest` | orchestrator, CLI |
+| `article_scraper.py` | Fetches linked article HTML at ingest, filters unsub/legal/app-store links, appends to `body_text` | `fetch_email_articles` | `ingest_gmail.py` (gated by `config.ARTICLE_SCRAPE_ENABLED`) |
+| `token_monitor.py` | Gmail OAuth token-health check | `check_token_expiration` | `ingest_orchestrator.py` (every cycle) |
 | `ingest_orchestrator.py` | ingest + post-ingest actions | `run_cycle` | `run_ingestion_service.bat` |
+| `digest_orchestrator.py` | runs every profile listed in `orchestration/digest.yaml` via `run_dispatch` | — | manual (`python src/digest_orchestrator.py`); not currently wired to a scheduled task |
 | `dispatch.py` | `kind: digest` | `run_dispatch`, `_load_profile`, `_resolve_bands`, `_build_prompt` | CLI / launcher |
 | `action_dispatch.py` | `kind: action` | `run_action`, `_load_profile`, `_TARGET_HANDLERS/_VALIDATORS/_CLIENTS`; `_run_aggregate` (aggregate mode) | CLI / launcher / orchestrator |
 | `todoist_client.py` | Todoist REST v1 | `TodoistClient` (`resolve_project_id`, `create_task`; `_unwrap_list`) | action_dispatch |
@@ -133,12 +136,17 @@ prompt — the two action-digest profiles each carry their own copy.)
 | System | Where | Auth / secret |
 |--------|-------|---------------|
 | Gmail | `gmail_client.py` (API read/label/trash + SMTP send) | OAuth client secret + token cache; app password — in `Secrets/` |
-| Anthropic | `llm_client.py` | `ANTHROPIC_API_KEY` (`Secrets/`) |
-| Todoist | `todoist_client.py` — REST **v1** (`config.TODOIST_BASE_URL`). Responses may be wrapped `{"results": [...]}`; `_unwrap_list` normalizes both bare lists and envelopes. Missing projects are auto-created. | `TODOIST_API_TOKEN` (`Secrets/todoist_keys.py`) |
+| Anthropic | `llm_client.py` | `ANTHROPIC_API_KEY` (via `security_config.py`) |
+| Todoist | `todoist_client.py` — REST **v1** (`config.TODOIST_BASE_URL`). Responses may be wrapped `{"results": [...]}`; `_unwrap_list` normalizes both bare lists and envelopes. Missing projects are auto-created. | `TODOIST_API_TOKEN` (via `security_config.py`) |
 | PostgreSQL | `db.py` (`localhost:5432`, DB `clearfeed`) | host/port/name/user in `config.py`; `DB_PASSWORD` in `security_config.py` |
 
-Secrets pattern: real values live in `Secrets/*.py`; `security_config.py`
-(gitignored) imports them; `config.py` reads from there.
+Secrets pattern: `security_config.py` lives at the project root, is
+gitignored (never committed), and is the only file `config.py` imports
+secrets from. `security_config.py` itself sources the actual values from a
+`Secrets/` directory that lives **outside this repo** (e.g.
+`C:\Users\<you>\Secrets` — see the `sys.path.insert` line in
+`scripts/migrate_sqlserver_to_postgres.py` for the exact convention); it is
+not a repo subfolder and does not need a `.gitignore` entry of its own.
 
 ---
 
@@ -146,13 +154,22 @@ Secrets pattern: real values live in `Secrets/*.py`; `security_config.py`
 
 - **`orchestration/ingest.yaml`** — `post_ingest_actions:` lists action profiles
   to run each cycle. Add a profile path to wire it into ingestion.
-- **`ingest_orchestrator.run_cycle`** — runs `run_ingest()`, then runs each
-  listed action profile via `run_action` **unconditionally every cycle**. Actions
-  handle their own deduplication via the `{{dedup}}` NOT EXISTS clause in `trigger.sql`
-  and use a long lookback window in their SQL so missed runs catch up automatically.
+- **`ingest_orchestrator.run_cycle`** — runs `token_monitor.check_token_expiration()`,
+  then `run_ingest()`, then runs each listed action profile via `run_action`
+  **unconditionally every cycle**. Actions handle their own deduplication via
+  the `{{dedup}}` NOT EXISTS clause in `trigger.sql` and use a long lookback
+  window in their SQL so missed runs catch up automatically.
 - **`scripts/run_ingestion_service.bat`** — infinite loop calling the
   orchestrator every `INGEST_POLL_INTERVAL_MINUTES`; launched hidden by
-  `launch_hidden.vbs`.
+  `launch_hidden.vbs`; watched by `scripts/watchdog_ingestion.ps1`
+  (`launch_watchdog.vbs` / `Ingestion_Watchdog.xml`), which restarts the
+  service if it stalls.
+- **`orchestration/digest.yaml`** — lists digest profiles for
+  `digest_orchestrator.run_all_digests` (`python src/digest_orchestrator.py`)
+  to run in one pass via `run_dispatch`. Unlike ingest, this orchestrator is **not**
+  currently wired to any scheduled task — each digest profile instead has its
+  own `scripts/tasks/*.xml` entry invoking `launch_digest.vbs <name>`
+  directly, so `digest_orchestrator.py` is a manual/ad-hoc entry point today.
 - **Scheduled tasks** (`scripts/tasks/*.xml`) pass a **bare profile name** to a
   hidden launcher (`launch_digest.vbs` / `launch_action.vbs`); the launcher
   supplies the stage and `.yaml` extension. Because the extension lives only in
