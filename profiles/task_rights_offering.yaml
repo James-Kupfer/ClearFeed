@@ -1,0 +1,98 @@
+kind: action
+name: task_rights_offering
+target: todoist
+mode: per_record
+model: haiku
+
+# --- Trigger ---
+# Picks up any unactioned rights offering record published by ROM.
+# No time-window filter — rights offerings are infrequent and always actionable.
+trigger:
+  sql: |
+    SELECT cr.id, cr.subject, cr.executive_summary, cr.body_text,
+           cr.linked_article_url, cr.received_at
+    FROM ContentRecords cr
+    WHERE cr.enrichment_status = 'complete'
+      AND cr.source_type = 'SEC_Edgar_rights_offering'
+      AND {{dedup}}
+    ORDER BY cr.received_at DESC LIMIT 20
+
+# --- Todoist task mapping ---
+# content: pre-formatted by ROM as "{CompanyName} ({Ticker}) Rights Offering @ ${Price}".
+# description: structured Markdown returned by the LLM below.
+# Priority is hardcoded P1 — all new rights offerings require immediate review.
+todoist:
+  project: "Business"
+  section: "Rights Offerings"
+  priority: 1
+  labels:
+    - clearfeed
+  due_string: "today"
+  content: "{subject}"
+  description: |
+    {description}
+
+    ---
+    [EDGAR Filing]({linked_article_url})
+    *task_rights_offering v2*
+
+# --- Prompt ---
+# Receives record fields as {placeholders}.
+# Returns strict JSON: {"description": "<structured Markdown>"}
+prompt: |
+  You are writing the description for a Todoist P1 task about a live rights offering.
+  Return STRICT JSON with no surrounding text or markdown fences.
+
+  ## Input
+
+  Subject: {subject}
+
+  Executive Summary:
+  {executive_summary}
+
+  Full Details:
+  {body_text}
+
+  ## Required Output
+
+  Return exactly this JSON structure:
+
+  {"description": "<structured Markdown>"}
+
+  ## Description Format
+
+  Write a compact, scannable reference card. Include only sections where data is present.
+  Sections in order:
+
+  **Key Terms**
+  Bulleted list — include all of: subscription price, record date, expiration date,
+  conversion ratio, gross proceeds, shares offered, dilution % (if available).
+  Format monetary values with $ and commas. Format dates as Mon D, YYYY.
+
+  **Oversubscription**
+  One line stating privilege (Yes/No) and cap terms, if applicable.
+
+  **Use of Proceeds**
+  One to two sentences verbatim or closely paraphrased from the filing.
+
+  **Context**
+  Bullets covering any of the following that are present in the filing — include all
+  that apply, not just 3:
+  - Management / insider participation: any stated intent by executives, directors, or
+    major shareholders to exercise their subscription rights (binding or non-binding).
+    Name the individual and their role. Note whether the commitment is binding or
+    non-binding (e.g. "Executive Chairman Marc Gabelli expressed non-binding intent
+    to participate").
+  - Backstop or standby commitment: party name and terms.
+  - Rights transferability and exchange listing (if rights are listed, name the exchange
+    and symbol).
+  - Pricing methodology (e.g. discount to VWAP — state the % and reference period).
+  - Exercise period and any extension provisions.
+  - Redomiciliation, reorganization, or other structural changes tied to the offering.
+  - Any other fact a sophisticated investor would want to know before deciding whether
+    to subscribe.
+
+  Omit this section entirely only if the filing contains none of the above.
+
+  Do not add commentary, hedging, or information not present in the input.
+  Keep it tight — this is a reference card, not a summary essay.

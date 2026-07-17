@@ -1,0 +1,39 @@
+You can now delete `create_action_digest.bat` — it's superseded. Scheduled Task setup for each digest:
+
+| Field | Value |
+|---|---|
+| **Program/script** | `wscript.exe` |
+| **Arguments** | `"C:\Users\James Kupfer\Claude\ClearFeed\scripts\launch_digest.vbs" action_digest` |
+| **Start in** | *(leave blank)* |
+
+To add another digest later, create a new Scheduled Task pointing at the same VBS with a different profile name argument — no new scripts needed.
+
+`bWaitOnReturn = True` means the Task Scheduler waits for the Python process to actually finish before marking the task complete, so success/failure status is accurate.
+
+-------
+
+Task Scheduler setup:
+
+General tab
+
+Field	Value
+Name	ClearFeed Ingestion Service
+Run only when user is logged on	✓ (OAuth tokens are per-user)
+Run with highest privileges	✓
+Triggers tab → New
+
+Field	Value
+Begin the task	At log on
+Specific user	Your account
+Delay task for	30 seconds (gives network time to come up)
+Actions tab → New
+
+Field	Value
+Program/script	wscript.exe
+Arguments	"C:\Users\James Kupfer\Claude\ClearFeed\scripts\launch_hidden.vbs"
+Start in	(leave blank)
+Settings tab
+
+Field	Value
+If the task is already running	Do not start a new instance
+Stop the task if it runs longer than	(disabled — it runs indefinitely)

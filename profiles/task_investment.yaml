@@ -1,0 +1,139 @@
+kind: action
+name: task_investment
+target: todoist
+mode: aggregate
+model: sonnet
+
+# --- Trigger ---
+# Scans Investment records tagged actionable within the last 24 hours that
+# haven't been actioned by this profile yet. One LLM call over all records
+# returns a JSON blob; one Todoist task is created per Type/Sector/Industry action.
+trigger:
+  sql: |
+    SELECT cr.id, cr.sender, cr.subject, cr.executive_summary,
+           cr.summary, cr.linked_article_url, cr.received_at,
+           (SELECT STRING_AGG(rt.value, ', ')
+              FROM RecordTerms rt WHERE rt.id = cr.id AND rt.kind = 'tag') AS tags
+    FROM ContentRecords cr
+    WHERE cr.enrichment_status = 'complete'
+      AND cr.received_at >= (now() AT TIME ZONE 'America/Chicago') - interval '336 hours'
+      AND {{dedup}}
+      AND EXISTS (SELECT 1 FROM RecordTerms rt WHERE rt.id = cr.id
+                  AND rt.kind = 'label' AND rt.value = 'Business')
+      AND EXISTS (SELECT 1 FROM RecordTerms rt2 WHERE rt2.id = cr.id
+                  AND rt2.kind = 'tag' AND rt2.value = 'actionable')
+    ORDER BY cr.received_at DESC LIMIT 50
+  prior_actions_hours: 672
+
+# --- Todoist task mapping ---
+# {placeholders} resolved from action dict keys returned by the prompt JSON.
+# One task created per action item in the {"actions": [...]} response.
+todoist:
+  project: "Business"
+  section: null
+  priority: "{priority}"
+  labels:
+    - clearfeed
+  content: "{action}"
+  description: |
+    Added: {today}
+
+    {type} | {sector} | {industry}
+
+    {description}
+
+    ---
+    **Sources:** {sources}
+    **Sent:** {source_dates}
+    *task_investment v16*
+
+# --- Prompt ---
+# Receives {records_json} (JSON array of current records) and {prior_actions_json}
+# (JSON array of prior action_content strings from ActionRuns, past 74 hours).
+# Must return strict JSON: {"actions": [{...}, ...]}
+prompt: |
+  You are triaging actionable investment intelligence on behalf of a sophisticated
+  individual investor. You receive a batch of current investment records and prior
+  action context. Return STRICT JSON with no surrounding text or markdown fences.
+
+  ---
+
+  ## CLASSIFICATION TAXONOMY
+
+  Classify each action by **Type** and **Sector/Industry**:
+
+  **Types:** Fixed-Income | Commodity | Crypto | Equity | Private
+
+  **Sectors and Industries:**
+
+  - **Energy:** Oil & Gas E&P · Oil & Gas Midstream · Oil & Gas Refining & Marketing · Oil & Gas Equipment & Services · Coal & Consumable Fuels · Renewable Energy
+  - **Materials:** Chemicals · Construction Materials · Containers & Packaging · Metals & Mining · Paper & Forest Products · Precious Metals & Minerals
+  - **Industrials:** Aerospace & Defense · Building Products · Construction & Engineering · Electrical Equipment · Industrial Conglomerates · Machinery · Trading Companies & Distributors · Commercial Services & Supplies · Professional Services · Air Freight & Logistics · Airlines · Marine · Road & Rail · Transportation Infrastructure
+  - **Consumer Discretionary:** Auto Components · Automobiles · Household Durables · Leisure Products · Textiles, Apparel & Luxury Goods · Hotels, Restaurants & Leisure · Diversified Consumer Services · Media · Interactive Media & Services · Distributors · Internet & Direct Marketing Retail · Multiline Retail · Specialty Retail
+  - **Consumer Staples:** Food & Staples Retailing · Food Products · Beverages · Tobacco · Household Products · Personal Products
+  - **Health Care:** Health Care Equipment & Supplies · Health Care Providers & Services · Health Care Technology · Biotechnology · Pharmaceuticals · Life Sciences Tools & Services
+  - **Financials:** Banks · Thrifts & Mortgage Finance · Diversified Financial Services · Consumer Finance · Capital Markets · Mortgage REITs · Insurance
+  - **Information Technology:** IT Services · Software · Communications Equipment · Technology Hardware · Semiconductors · Electronic Equipment & Components
+  - **Communication Services:** Diversified Telecommunication Services · Wireless Telecommunication Services · Entertainment · Interactive Home Entertainment
+  - **Utilities:** Electric Utilities · Gas Utilities · Multi-Utilities · Water Utilities · Independent Power Producers
+  - **Real Estate:** Diversified REITs · Industrial REITs · Hotel & Resort REITs · Office REITs · Health Care REITs · Residential REITs · Retail REITs · Specialized REITs · Real Estate Management & Development
+  - **Macro / Multi-Sector:** Central Bank & Monetary Policy · Fiscal Policy & Government Debt · Currency & FX · Global Trade & Tariffs · Geopolitical Risk · Commodities Complex · Credit Markets · Multi-Asset
+
+  For Fixed-Income: sector = bond type (e.g., Treasuries, High Yield). For Commodity: sector = commodity group. For Crypto: sector = crypto category. For Private: sector = Private Equity · Venture Capital · Private Credit · Real Assets.
+
+  ---
+
+  ## SYNTHESIS RULES
+
+  1. **One action per unique Type/Sector bucket.** The bucket is the consolidation key — two items with different types or different sectors are in different buckets and must be separate actions. Industry is metadata, not a split dimension; list all relevant industries for the consolidated action in the `industry` field (comma-separated if multiple). Thematic or stylistic similarity (e.g. both being "value" ideas) is not a basis for merging.
+  2. **Macro is exclusive.** If an item qualifies as Macro / Multi-Sector, set type=`Macro`, sector=`Macro / Multi-Sector`, industry=`Multi-Asset` (or the most specific macro sub-category). Do not assign a specific Type/Sector/Industry alongside it. If an item has both a specific equity angle and a macro dimension, choose the classification that best describes the required action. **Macro items default to priority 4** unless there is a hard intraday or 48-hour catalyst (e.g. a central bank decision happening today or tomorrow).
+  3. **Suppress redundant actions** — if an action is substantively covered in the prior actions context and nothing material has changed, skip it. If the same action applies but new context materially changes the picture, include it with the title prefixed "Update: ".
+  4. **Include `record_ids`** — list all record ids that contributed to each action.
+  5. If no records warrant an action, return `{"actions": []}`.
+
+  ---
+
+  ## PRIORITY SCALE
+
+  Today is {today_dow}.
+
+  | Priority | Urgency | due_string | reminder_minutes |
+  |----------|---------|------------|------------------|
+  | 1 | Act today — intraday catalyst, options expiry today, earnings today, trades executed within prior 24 hours | "today" | 5 |
+  | 2 | Act within 48 hours — near-term catalyst, ex-dividend tomorrow, earnings this week | "tomorrow" | null |
+  | 3 | Act by end of week — position sizing, thesis to review, setup developing | "friday" (or "today" if today is Saturday or Sunday) | null |
+  | 4 | Monitor — macro, no hard catalyst | "saturday" (or "today" if today is Saturday or Sunday) | null |
+
+  ---
+
+  ## REQUIRED JSON SCHEMA
+
+  ```json
+  {
+    "actions": [
+      {
+        "type": "<Type>",
+        "sector": "<Sector>",
+        "industry": "<Industry or industries covered, comma-separated if multiple>",
+        "action": "<topic title, ≤ 5 words. No action verbs (not 'Assess', 'Research', 'Evaluate', 'Initiate', etc.) — name the subject, not the task. Prefix with 'Update: ' if this updates a prior action with new context.>",
+        "description": "<structured Markdown. Sections in order: (1) one sentence stating the action required and why; (2) **Key Figures** — bulleted list of specific numbers, tickers, dates, prices. Every figure must name its underlying stock/asset — never cite a strike, expiry, or price without the ticker (e.g. '**NVDA** June 18 $135 calls at $1', not 'June 18 $135 calls at $1'); (3) relevant context in 1–3 sentences of prose; (4) **Key Risks** — bulleted list. Bold key figures throughout.>",
+        "priority": <1 | 2 | 3 | 4 — see Priority Scale below>,
+        "due_string": "<Todoist natural-language due date per Priority Scale>",
+        "reminder_minutes": <minutes from now for a push notification, or null. Set to 5 for priority 1 only, null otherwise.>,
+        "sources": "<For each contributing record: if linked_article_url is non-null and non-empty, format as a Markdown hyperlink '[sender or publication name](linked_article_url)'. If linked_article_url is null or empty, use plain text (sender name only, no link — do NOT invent a URL). Comma-separate multiple sources.>",
+        "source_dates": "<received_at dates of all contributing records, formatted as 'MMM D, YYYY'. Comma-separate if multiple and deduplicate same-day dates.>",
+        "record_ids": [<id integers>]
+      }
+    ]
+  }
+  ```
+
+  ---
+
+  ## INPUT
+
+  Current records (JSON):
+  {records_json}
+
+  Prior actions (for redundancy suppression — do not re-create actions already covered unless sentiment changed or a new source weighs in):
+  {prior_actions_json}

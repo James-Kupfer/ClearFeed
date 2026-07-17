@@ -1,0 +1,233 @@
+kind: action
+name: task_connection
+target: todoist
+model: sonnet
+
+# --- Trigger ---
+# Scans records classified in the last window_hours that haven't been actioned
+# by this profile yet. tag_match: all means the record must carry EVERY listed tag.
+# Each matching record is processed independently — one prompt call, one task.
+# exclude_sender_patterns blocks records before any LLM call — preferred over
+# prompt-level detection for known senders that never produce real connection requests.
+trigger:
+  sql: |
+    SELECT cr.id, cr.sender, cr.subject, cr.executive_summary,
+           cr.body_text, cr.linked_article_url
+    FROM ContentRecords cr
+    WHERE cr.enrichment_status = 'complete'
+      AND cr.processed_at >= (now() AT TIME ZONE 'America/Chicago') - interval '336 hours'
+      AND {{dedup}}
+      AND EXISTS (SELECT 1 FROM RecordTerms rt WHERE rt.id = cr.id
+                  AND rt.kind = 'label' AND rt.value = 'Professional')
+      AND EXISTS (SELECT 1 FROM RecordTerms rt2 WHERE rt2.id = cr.id
+                  AND rt2.kind = 'tag' AND rt2.value = 'connection_request')
+      AND cr.sender NOT LIKE '%jobalerts%'
+      AND cr.sender NOT LIKE '%jobs-noreply@linkedin%'
+      AND cr.sender NOT LIKE '%jobsearch-noreply@linkedin%'
+      AND cr.sender NOT LIKE '%talent@linkedin%'
+    ORDER BY cr.processed_at DESC LIMIT 50
+
+# --- Todoist task mapping ---
+# {placeholders} are resolved from: inputs above + keys returned by the prompt JSON.
+# prompt.priority (int 1-4) overrides the static priority here if present.
+# Skip task creation entirely when prompt returns is_job_alert: true.
+# content is now built by the prompt (task_content) so the verb matches the action.
+todoist:
+  project: "Professional"
+  section: null
+  skip_if: "is_job_alert"
+  priority: 3
+  labels:
+    - clearfeed
+  forward_due_date: 7
+  content: "{task_content}"
+  description: |
+    Added: {today}
+
+    {description}
+
+    ---
+    **From:** {sender}
+    **Subject:** {subject}
+    **Link:** {linked_article_url}
+
+# --- Prompt ---
+# Interpolated with {input} placeholders before the LLM call.
+# Must return strict JSON — keys become available as {placeholders} in the
+# todoist content/description templates above.
+#
+# Required keys: is_job_alert, name, action, task_content, intro_message,
+#                shared_connections, at_wells_fargo, accept_url, decline_url,
+#                review_url, description, priority
+# action values: Accept | Decline | Review | Respond | Meeting
+prompt: |
+  You are triaging an inbound LinkedIn connection request on behalf of a senior
+  executive (James — AI Platform Architect, multi-agent orchestration and AI
+  governance in financial services). Each record you receive is a single
+  connection request or message. Analyze the sender and full summary below and
+  return STRICT JSON with no surrounding text or markdown fences.
+
+  STEP 1 — SKIP CHECK
+  Set is_job_alert: true and return immediately with only that key if ANY of
+  the following apply. Do not populate any other keys.
+
+  1a. Job alert: the record is a LinkedIn job alert, job recommendation, or
+      automated notification unrelated to a person-to-person connection.
+      Signals: subject contains "job alert", "recommended jobs", "jobs for you",
+      "new jobs matching"; sender is a no-reply address; body_text describes
+      job listings rather than a person requesting to connect.
+
+  1b. Acceptance notification without a message: the subject or body_text
+      indicates that someone accepted James's LinkedIn invitation AND the
+      body_text contains no personal message from that person directed at him —
+      only the automated notification text. If a personal message from them IS
+      present, do not skip; continue to Step 2.
+
+  STEP 2 — EXTRACT FIELDS FROM BODY TEXT
+  Parse the following from the body_text field:
+    - intro_message: the text of any personal message the requester included.
+      If none was provided, set to "None provided."
+    - shared_connections: the number of shared LinkedIn connections, as an
+      integer. If not stated, set to 0.
+    - at_wells_fargo: true if the requester is currently employed at Wells Fargo,
+      false otherwise. Base on their stated current employer in the body_text.
+    - accept_url: the LinkedIn URL to accept the connection request. Extract from
+      body_text; set to "" if not present.
+    - decline_url: the LinkedIn URL to decline the connection request. Extract
+      from body_text; set to "" if not present.
+    - review_url: the LinkedIn URL to view the requester's original message or
+      profile. Extract from body_text; set to "" if not present.
+
+  STEP 3 — SIGNAL DETECTION
+  Classify two signals before choosing an action.
+
+  3.1 TRANSACTIONAL vs COLLABORATIVE (the primary discriminator)
+    - transactional_sell = the outreach exists to move James toward a purchase or
+      paid engagement — a product, service, fund, or investment vehicle is being
+      sold. Detect from EITHER of:
+        (i)  NOTE signals: pitch language, "our platform/product/fund/philosophy,"
+             a booked-call or demo CTA tied to an offering, honorarium/sales hooks
+             framed around buying or engaging a service.
+        (ii) ROLE signals: sender's current role/company is sales-, vendor-,
+             advisory-services-, or business-development-oriented (e.g. vendor
+             sales, wealth/financial advisor, agency founder, "Head of GTM" at a
+             product company pitching that product, BD titles at a services firm).
+      Treat it as transactional when role AND note together read as a sales pitch.
+      A sales-adjacent title alone (with a purely collaborative note) is NOT
+      sufficient — see collaborative.
+    - collaborative = a peer wants to exchange notes / connect around a shared
+      build-space with nothing being sold ("compare notes," "would love to
+      connect," references James's specific work, no product or paid ask).
+
+  3.2 OPT-IN CATEGORY (affirmative-interest categories — never auto-decline)
+    - advisory: advisory board or fractional-executive outreach.
+    - research: a research study aligned to AI adoption, governance, investment
+      priorities, or workforce support. (Alignment to these topics is required;
+      an off-topic paid study is not opt-in.)
+
+  STEP 4 — ACTION DETERMINATION (evaluate in order; first match wins)
+    a. Existing-connection message: the record is an inbound MESSAGE from someone
+       already connected to James (not a new invitation — e.g. "X just messaged
+       you", messaging digest) → action = "Respond".
+    b. Opt-in category (advisory or aligned research per 3.2) → action = "Meeting".
+    c. Wells Fargo: if at_wells_fargo is true → action = "Accept" (unless the
+       sender profile gives clear reason to decline).
+    d. Transactional sell (per 3.1) → action = "Decline". This fires even when the
+       outreach is personalized, on-topic, or proposes an in-person meet in Austin.
+       Transactional detection OVERRIDES the Austin-event rule below.
+    e. Genuine professional or community EVENT invitation (a real event, not a
+       1:1 sales coffee/lunch) → action = "Review".
+    f. Collaborative peer outreach (per 3.1 — specific reference to James's work,
+       no sale) → action = "Review". Surface to James; never auto-Meeting,
+       never auto-Decline. (Borderline peer/builder outreach lands here.)
+    g. No intro message AND not Wells Fargo AND none of the above → action = "Decline".
+    h. Otherwise → action = "Review".
+
+  STEP 5 — RETURN JSON
+
+  Required JSON keys:
+    "is_job_alert"        — boolean (see Step 1).
+    "name"                — requester's full name. Infer from sender address,
+                            subject, or body_text if not explicit. "Unknown" if
+                            indeterminate.
+    "action"              — one of: "Accept", "Decline", "Review", "Respond",
+                            "Meeting".
+    "task_content"        — the Todoist task title, phrased per action:
+                              Accept   → "Accept connection from {name}"
+                              Decline  → "Decline connection from {name}"
+                              Review   → "Review connection request from {name}"
+                              Respond  → "Respond to message from {name}"
+                              Meeting  → "Propose meeting time with {name}"
+                            Substitute the actual name; do not leave a literal
+                            {name}.
+    "intro_message"       — extracted per Step 2.
+    "shared_connections"  — integer extracted per Step 2.
+    "at_wells_fargo"      — boolean extracted per Step 2.
+    "accept_url"          — extracted per Step 2.
+    "decline_url"         — extracted per Step 2.
+    "review_url"          — extracted per Step 2.
+    "description"         — structured Markdown using this exact bullet format:
+
+                            • **Recommendation:** the action word as a Markdown link to the corresponding URL (mapping below) — followed by 1–2 sentence rationale. For "Respond" use the plain word "Respond" (link to review_url if present).
+                            • **Background:** 2–3 sentences on who this person is, their role and employer, and why they are reaching out.
+                            • **Intro:** verbatim intro message, or "None."
+                            • **Connections:** the shared_connections integer followed by "shared connection(s)."
+
+                            URL / label mapping for the Recommendation link:
+                              Accept  → accept_url,  label "Accept"
+                              Decline → decline_url, label "Decline"
+                              Review  → review_url,  label "Review"
+                              Respond → review_url,  label "Reply"
+                              Meeting → review_url,  label "Reply"
+                            Meeting and Respond do NOT accept the connection —
+                            they route James to reply with the proposed note.
+                            Do not use accept_url for these actions.
+
+                            IF action is "Meeting", append after a blank line the
+                            drafted reply (James sends this in response — it does
+                            NOT accept the request). Fill the bracketed line with
+                            a one-sentence, specific reference to their work or
+                            the reason they reached out:
+
+                            ---
+                            **Proposed Note** (default slot: Thursday 2:00 PM CST)
+
+                            Hi [first name], thanks for reaching out — [one
+                            specific sentence acknowledging their work or the
+                            reason for the connection]. I'd be glad to compare
+                            notes. I keep these to 30 minutes by video. Does
+                            Thursday at 2:00 PM CST work for you? If not, send a
+                            couple of windows that suit you and I'll make one
+                            work. Best, James
+
+                            IF action is "Decline", append after a blank line:
+
+                            ---
+                            **Decline Message**
+
+                            I built an agentic system to help triage my
+                            incoming messages and connection requests. The agent
+                            decided to decline your connection request. I am not
+                            an open networker — if you decide to resubmit your
+                            request, please include sufficient rationale as to
+                            why I should accept it, or you will be auto-ignored
+                            permanently. Sincerely, James
+
+                            For EVERY action, append the remaining action links
+                            after a blank line, omitting the one already used
+                            inline with the recommendation:
+
+                            ---
+                            [Accept](url) · [Decline](url) · [Review](url)
+
+    "priority"            — integer 1-4 where 4 = act immediately, 1 = low
+                            urgency. Base on strategic relevance, Wells Fargo
+                            affiliation, opt-in category, shared connections, and
+                            sender profile. Auto-declines default to 1 unless
+                            time-sensitive. Meeting/Respond default to 3+.
+
+  Sender: {sender}
+  Subject: {subject}
+  Executive Summary: {executive_summary}
+  Body Text: {body_text}
+  Link: {linked_article_url}

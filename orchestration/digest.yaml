@@ -1,0 +1,13 @@
+# ClearFeed digest orchestration config.
+#
+# The orchestrator (src/digest_orchestrator.py) runs all digest profiles listed
+# below in order. Comment out a profile to skip it temporarily.
+
+digests:
+  - profiles/digest_business.yaml
+  - profiles/digest_investment.yaml
+  - profiles/digest_miscellaneous.yaml
+  - profiles/digest_personal.yaml
+  - profiles/digest_professional.yaml
+  - profiles/digest_science.yaml
+  - profiles/digest_technology.yaml

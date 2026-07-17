@@ -1,0 +1,15 @@
+kind: export
+name: job_export
+sql: |
+  SELECT cr.id, cr.subject, cr.sender, cr.processed_at, cr.summary,
+         cr.body_text, cr.linked_article_url
+  FROM ContentRecords cr
+  WHERE cr.enrichment_status = 'complete'
+    AND cr.processed_at >= (now() AT TIME ZONE 'America/Chicago') - interval '48 hours'
+    AND EXISTS (SELECT 1 FROM RecordTerms rt WHERE rt.id = cr.id
+                AND rt.kind = 'label' AND rt.value = 'Professional')
+    AND EXISTS (SELECT 1 FROM RecordTerms rt2 WHERE rt2.id = cr.id
+                AND rt2.kind = 'tag' AND rt2.value IN ('job_search', 'recruiter'))
+  ORDER BY cr.processed_at DESC LIMIT 500
+output_path: O:\OneDrive\Claude\My Coworker\Job Search\Listings
+filename_template: job_export_{timestamp}.xlsx
