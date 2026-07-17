@@ -144,9 +144,8 @@ Secrets pattern: `security_config.py` lives at the project root, is
 gitignored (never committed), and is the only file `config.py` imports
 secrets from. `security_config.py` itself sources the actual values from a
 `Secrets/` directory that lives **outside this repo** (e.g.
-`C:\Users\<you>\Secrets` — see the `sys.path.insert` line in
-`scripts/migrate_sqlserver_to_postgres.py` for the exact convention); it is
-not a repo subfolder and does not need a `.gitignore` entry of its own.
+`C:\Users\<you>\Secrets`); it is not a repo subfolder and does not need a
+`.gitignore` entry of its own.
 
 ---
 
