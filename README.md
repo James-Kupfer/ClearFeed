@@ -1,9 +1,38 @@
-﻿# ClearFeed
+# ClearFeed
 
-Personal email-to-action pipeline. Ingests Gmail, enriches each item with LLM
-summarization + classification, then dispatches **digests** (topic briefs by
-email), **actions** (per-record tasks in external systems like Todoist), and
-**exports** (Excel) — all driven by self-contained YAML profiles.
+Your inbox already contains everything you need to act on — it's just buried.
+
+ClearFeed is a multifaceted productivity tool that distills your inbox, decides what's important, and turns it into the digest, task list, or export you'd write yourself, if you had the time. You control it through customizeable prompts, so every output is tuned to your objectives.
+
+ClearFeed watches a Gmail inbox, has an LLM read and classify every new email, and turns that stream into whatever you actually need: a digest to read, a task to act on, or a spreadsheet to work from. No triage, no manual sorting — just define what you want in a YAML file and ClearFeed keeps producing it.
+
+Three outputs, same underlying pipeline:
+
+- **Digests** — a recurring email that rolls up everything matching a rule into one readable brief. Example: `profiles/digest_investment.yaml` sends a weekly "Investment Digest" — every email tagged `Investment` from the past week, condensed to a couple of sentences with a link back to the source. 
+- **Actions** — turns a matching email into a task with an actual recommendation, not just a copy of the email. Example: `profiles/task_connection.yaml` watches for LinkedIn connection requests and creates a Todoist task like "Set up a meeting with Jane Doe." An investment-tagged email with a material update might produce "Review the deep value thesis of XYZ Company" instead of just landing in your inbox unread.
+- **Exports** — a point-in-time spreadsheet snapshot of matching emails, for when you want to work the data outside the pipeline. Example: `profiles/investment_export.yaml` dumps every `Investment`-tagged email from the past week into an `.xlsx` — sender, summary, link — for offline review or import elsewhere.
+
+Adding a new digest, action, or export is normally just one new YAML file — no code.
+
+Each digest and action carries its own prompt, written by you and inlined right in the YAML — so you're not stuck with a generic summary. Want the Investment Digest to focus on a specific market sector? Want connection-request tasks phrased as a one-line intro pitch instead of "reply to X"? Edit the prompt. Every profile is a fully custom view of your inbox, tuned to exactly what you want to see and how you want it framed.
+
+Concretely, the flow for one email looks like:
+
+```
+Gmail: "Sam wants to connect on LinkedIn"
+   │
+   ▼  ingest_gmail.py: fetch, summarize (LLM), classify (LLM) → label=Professional, tag=connection_request
+PostgreSQL: ContentRecords row + RecordTerms rows
+   │
+   ▼  action_dispatch.py loads profiles/task_connection.yaml, sees this record matches the trigger SQL
+Todoist: new task "Reply to connection request from Sam" in the Professional project
+```
+
+The same stored record can *also* feed a weekly `digest_professional.yaml`
+brief and a `job_export.yaml` spreadsheet — each profile just queries the
+same `ContentRecords` table differently. Adding a new digest, action, or
+export is normally just adding one new YAML file to `profiles/`; see
+[Adding a new capability](#adding-a-new-capability) below.
 
 For a code-and-integration map (what to change for a given task), see
 [`system_architecture.md`](system_architecture.md).
@@ -153,20 +182,18 @@ This must be present in `trigger.sql` — `_load_profile` rejects profiles witho
 
 ```yaml
 kind: export
-name: job_export
+name: investment_export
 sql: |
   SELECT cr.id, cr.subject, cr.sender, cr.processed_at, cr.summary,
          cr.body_text, cr.linked_article_url
   FROM ContentRecords cr
   WHERE cr.enrichment_status = 'complete'
-    AND cr.processed_at >= (now() AT TIME ZONE 'America/Chicago') - interval '48 hours'
+    AND cr.processed_at >= (now() AT TIME ZONE 'America/Chicago') - interval '168 hours'
     AND EXISTS (SELECT 1 FROM RecordTerms rt WHERE rt.id = cr.id
-                AND rt.kind = 'label' AND rt.value = 'Professional')
-    AND EXISTS (SELECT 1 FROM RecordTerms rt2 WHERE rt2.id = cr.id
-                AND rt2.kind = 'tag' AND rt2.value IN ('job_search', 'recruiter'))
+                AND rt.kind = 'label' AND rt.value = 'Investment')
   ORDER BY cr.processed_at DESC LIMIT 500
-output_path: "O:\\...\\Listings"
-filename_template: "job_export_{timestamp}.xlsx"
+output_path: "O:\\...\\Exports"
+filename_template: "investment_export_{timestamp}.xlsx"
 ```
 
 Column headers in the Excel output are derived from `cursor.description` (the SQL `SELECT` column names/aliases) — no separate `columns:` list.
@@ -226,7 +253,7 @@ clearfeed.bat dispatch profiles\investment_digest.yaml
 clearfeed.bat action profiles\task_connection.yaml
 
 :: Export to Excel
-clearfeed.bat export profiles\job_export.yaml
+clearfeed.bat export profiles\investment_export.yaml
 
 :: Re-run classify / summarize on stored records (see Reprocess)
 clearfeed.bat reprocess --label Investment
@@ -314,10 +341,3 @@ ClearFeed/
 ├── clearfeed.bat             # stage runner (ingest|dispatch|action|export|reprocess|…)
 └── master.bat                # full pipeline (tests + ingest + dispatch all)
 ```
-
-## v2 Roadmap
-
-- **Playwright action target** — browser automation as a drop-in `target`
-  (handler stub + extension point already in `action_dispatch.py`).
-- File intake (`_intake/` watch for PDF/DOCX/EML/TXT).
-- Article scraping; vision LLM on stored images; DOCX report renderer.
