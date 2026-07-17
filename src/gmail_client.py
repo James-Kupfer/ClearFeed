@@ -81,8 +81,20 @@ def _get_credentials() -> Credentials:
             log.warning("[_get_credentials] No valid token to refresh, will attempt browser consent flow")
             try:
                 flow = InstalledAppFlow.from_client_secrets_file(str(secret_path), _SCOPES)
-                log.info("[_get_credentials] Starting browser consent flow...")
-                creds = flow.run_local_server(port=0)
+                log.info(
+                    "[_get_credentials] Starting browser consent flow (timeout=%ds)...",
+                    config.GMAIL_OAUTH_TIMEOUT_SECONDS,
+                )
+                # timeout_seconds is required here: ClearFeed's scheduled/hidden runs
+                # (run_ingestion_service.bat, launch_digest.vbs, launch_action.vbs) have
+                # no one present to complete a browser consent. Without a bound, this
+                # call blocks forever waiting for the OAuth redirect, which silently
+                # stalls the whole ingest polling loop (the batch file's `goto loop`
+                # never runs again). Timing out lets it raise instead, so the caller's
+                # exception handling logs it and the next scheduled cycle retries.
+                creds = flow.run_local_server(
+                    port=0, timeout_seconds=config.GMAIL_OAUTH_TIMEOUT_SECONDS
+                )
                 log.info("[_get_credentials] ✓ Browser consent flow completed")
             except Exception as exc:
                 log.exception("[_get_credentials] ✗ Browser consent flow failed")

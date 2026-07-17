@@ -50,18 +50,18 @@ def run_cycle(dry_run: bool = False) -> None:
     try:
         token_info = check_token_expiration()
         if token_info:
-            log.info(
-                "[run_cycle] Token status: expires %s UTC (%d days remaining)",
-                token_info["expires_datetime"].isoformat(),
-                token_info["days_until_expiration"],
-            )
-            if token_info["warning_sent"]:
-                log.warning(
-                    "[run_cycle] Expiration warning email was sent to %s",
-                    token_info["notification_email"],
+            log.info("[run_cycle] Token status: healthy=%s", token_info["healthy"])
+            if not token_info["healthy"]:
+                log.error(
+                    "[run_cycle] ✗ Gmail token is unhealthy: %s", token_info["error"]
                 )
+                if token_info["warning_sent"]:
+                    log.warning(
+                        "[run_cycle] Re-auth notification email was sent to %s",
+                        token_info["notification_email"],
+                    )
     except Exception:
-        log.exception("[run_cycle] Token expiration check failed (non-fatal)")
+        log.exception("[run_cycle] Token health check failed (non-fatal)")
 
     # Stage 1 — Gmail ingest
     if orch.get("gmail_ingest", True):

@@ -1,39 +1,46 @@
-"""Gmail OAuth token expiration monitoring for ClearFeed.
+"""Gmail OAuth token health monitoring for ClearFeed.
 
-Checks token expiration and sends email notifications before the token expires.
+Verifies the cached Gmail token can still be refreshed and sends an email
+notification if it can't.
 """
 
-import json
 import logging
 import sys
 import os
-from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import config
 import security_config
-from gmail_client import send_email
+from gmail_client import _SCOPES, send_email
 
 log = logging.getLogger(__name__)
 
 
 def check_token_expiration() -> dict | None:
-    """Check if Gmail token will expire soon and send notification if needed.
+    """Verify the cached Gmail token can still be refreshed; notify if not.
+
+    Google does not expose an expiration timestamp for the long-lived refresh
+    token itself — the `expiry` field in the cached credentials file is the
+    short-lived (~1 hour) access token's expiry, which is unrelated to
+    whether the refresh token is still valid. The only reliable signal is
+    attempting an actual refresh, so that's what this does.
 
     Returns:
-        Dict with token info if expiration check was performed, None if token missing/invalid.
-        Format: {
-            'expires_at': unix_timestamp,
-            'expires_datetime': datetime object,
-            'days_until_expiration': int,
+        Dict with token health info, or None if the check could not be
+        performed (e.g. no token file). Format: {
+            'healthy': bool,
+            'error': str | None,
             'warning_sent': bool,
             'notification_email': str
         }
     """
     token_path = Path(security_config.GMAIL_TOKEN_CACHE)
 
-    log.info("[token_monitor] Checking token expiration...")
+    log.info("[token_monitor] Checking token health...")
     log.info("[token_monitor] Token path: %s (exists: %s)", token_path, token_path.exists())
 
     if not token_path.exists():
@@ -41,83 +48,65 @@ def check_token_expiration() -> dict | None:
         return None
 
     try:
-        with open(token_path, "r", encoding="utf-8") as f:
-            token_data = json.load(f)
-    except Exception as exc:
-        log.exception("[token_monitor] Failed to read token file")
+        creds = Credentials.from_authorized_user_file(str(token_path), _SCOPES)
+    except Exception:
+        log.exception("[token_monitor] Failed to load cached credentials")
         return None
-
-    expires_at = token_data.get("expires_at")
-    if not expires_at:
-        log.warning("[token_monitor] No expires_at field in token file")
-        return None
-
-    # Convert Unix timestamp to datetime
-    expires_datetime = datetime.fromtimestamp(expires_at, tz=timezone.utc)
-    now = datetime.now(timezone.utc)
-    days_until_expiration = (expires_datetime - now).days
-
-    log.info(
-        "[token_monitor] Token expires at %s (UTC) — %d days remaining",
-        expires_datetime.isoformat(),
-        days_until_expiration,
-    )
 
     result = {
-        "expires_at": expires_at,
-        "expires_datetime": expires_datetime,
-        "days_until_expiration": days_until_expiration,
+        "healthy": True,
+        "error": None,
         "warning_sent": False,
         "notification_email": config.TOKEN_EXPIRATION_NOTIFICATION_EMAIL,
     }
 
-    # Check if warning should be sent
-    if days_until_expiration <= 0:
-        log.error(
-            "[token_monitor] ✗ Token has EXPIRED or will expire today! (%d days)",
-            days_until_expiration,
-        )
-        result["warning_sent"] = _send_expiration_notification(
-            expires_datetime, days_until_expiration, is_expired=True
-        )
-    elif days_until_expiration <= config.TOKEN_EXPIRATION_WARNING_DAYS:
-        log.warning(
-            "[token_monitor] Token will expire in %d day(s) — sending notification",
-            days_until_expiration,
-        )
-        result["warning_sent"] = _send_expiration_notification(
-            expires_datetime, days_until_expiration, is_expired=False
-        )
-    else:
-        log.info("[token_monitor] Token is healthy (%d days until expiration)", days_until_expiration)
+    if creds.valid:
+        log.info("[token_monitor] Token is healthy (access token still valid)")
+        return result
 
-    return result
+    if not creds.refresh_token:
+        result["healthy"] = False
+        result["error"] = "Cached credentials have no refresh_token"
+        log.error("[token_monitor] ✗ %s — re-auth required", result["error"])
+        result["warning_sent"] = _send_expiration_notification(result["error"])
+        return result
+
+    try:
+        creds.refresh(Request())
+        token_path.write_text(creds.to_json(), encoding="utf-8")
+        log.info("[token_monitor] ✓ Token refreshed successfully — healthy")
+        return result
+    except Exception as exc:
+        result["healthy"] = False
+        result["error"] = str(exc)
+        log.error("[token_monitor] ✗ Token refresh FAILED: %s", exc)
+        result["warning_sent"] = _send_expiration_notification(result["error"])
+        return result
 
 
-def _send_expiration_notification(
-    expires_datetime: datetime, days_remaining: int, is_expired: bool = False
-) -> bool:
-    """Send email notification about token expiration.
+def _send_expiration_notification(error: str) -> bool:
+    """Send email notification that the Gmail token needs re-authentication.
 
     Args:
-        expires_datetime: When the token expires
-        days_remaining: Days until expiration (negative if already expired)
-        is_expired: True if token has already expired
+        error: the refresh failure reason, included in the notification body.
 
     Returns:
-        True if email was sent successfully, False otherwise
+        True if the email was sent successfully, False otherwise. Note this
+        send itself goes through the same (broken) Gmail credentials, so it
+        will typically also fail — the attempt is still made in case the
+        access token portion is usable even though the refresh token isn't
+        (e.g. it hasn't been used yet this hour).
     """
     try:
-        if is_expired:
-            subject = "🚨 URGENT: Gmail OAuth Token EXPIRED - ClearFeed Ingest is Down"
-            body_text = f"""Your Gmail OAuth token for ClearFeed has EXPIRED.
+        subject = "🚨 URGENT: Gmail OAuth Token Invalid - ClearFeed Ingest is Down"
+        body_text = f"""Your Gmail OAuth token for ClearFeed could not be refreshed.
 
-Token expired at: {expires_datetime.isoformat()}
+Reason: {error}
 
 ⚠️  ClearFeed email ingestion is currently non-functional.
 
 ACTION REQUIRED:
-1. Delete the expired token file
+1. Delete the token file
 2. Restart the ClearFeed ingest service
 3. Complete the Gmail authorization in your browser
 4. New token will be cached automatically
@@ -125,24 +114,12 @@ ACTION REQUIRED:
 Token path: {security_config.GMAIL_TOKEN_CACHE}
 
 Once authorized, email ingestion will resume and emails will be properly classified."""
-        else:
-            subject = f"⏰ Gmail OAuth Token Expiring in {days_remaining} Day(s) - ClearFeed"
-            body_text = f"""Your Gmail OAuth token for ClearFeed will expire soon.
 
-Token will expire at: {expires_datetime.isoformat()}
-Days remaining: {days_remaining}
+        log.info(
+            "[token_monitor] Sending re-auth notification to %s",
+            config.TOKEN_EXPIRATION_NOTIFICATION_EMAIL,
+        )
 
-To prevent ClearFeed from stopping, you should re-authenticate:
-1. Delete the token file: {security_config.GMAIL_TOKEN_CACHE}
-2. Restart the ClearFeed ingest service
-3. Complete the Gmail authorization when prompted
-4. New token will be cached automatically
-
-You can do this anytime before expiration. The sooner you refresh, the sooner the new token will be ready."""
-
-        log.info("[token_monitor] Sending expiration notification to %s", config.TOKEN_EXPIRATION_NOTIFICATION_EMAIL)
-
-        # Send the email using Gmail API
         send_email(
             to=config.TOKEN_EXPIRATION_NOTIFICATION_EMAIL,
             subject=subject,
@@ -150,9 +127,9 @@ You can do this anytime before expiration. The sooner you refresh, the sooner th
             plain_body=body_text,
         )
 
-        log.info("[token_monitor] ✓ Expiration notification sent successfully")
+        log.info("[token_monitor] ✓ Re-auth notification sent successfully")
         return True
 
-    except Exception as exc:
-        log.exception("[token_monitor] ✗ Failed to send expiration notification")
+    except Exception:
+        log.exception("[token_monitor] ✗ Failed to send re-auth notification")
         return False

@@ -49,9 +49,13 @@ INGEST_POLL_INTERVAL_MINUTES = 15 # polling interval used by run_ingestion.bat
 INGEST_DRY_RUN_LIMIT = 10         # default thread cap for --dry-run mode
 PROCESSED_LABEL = "ProcessedClearFeed"  # marks a thread as fully ingested
 
-# --- Gmail OAuth token expiration monitoring ---
-TOKEN_EXPIRATION_WARNING_DAYS = 7  # send warning email this many days before token expires
-TOKEN_EXPIRATION_NOTIFICATION_EMAIL = "clearfeed@kupfer.me"  # where to send expiration warnings
+# --- Gmail OAuth token health monitoring ---
+TOKEN_EXPIRATION_NOTIFICATION_EMAIL = "clearfeed@kupfer.me"  # where to send re-auth alerts
+# Bound on the interactive browser consent flow (_get_credentials). Without this,
+# a scheduled/hidden run that hits an invalid refresh token blocks forever waiting
+# for a browser redirect nobody is present to complete, silently killing the
+# ingest polling loop until someone notices and manually restarts it.
+GMAIL_OAUTH_TIMEOUT_SECONDS = 120
 BUCKET_LABELS = [  # Gmail labels auto-created at ingest startup. "Spam" is excluded — it's a reserved Gmail name;
                    # LLM Spam classifications are handled as a direct trash (no label, no DB write).
     "Business",
