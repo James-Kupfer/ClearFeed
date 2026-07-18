@@ -10,7 +10,7 @@ Three outputs, same underlying pipeline:
 
 - **Digests** — a recurring email that rolls up everything matching a rule into one readable brief. Example: `profiles/digest_investment.yaml` sends a weekly "Investment Digest" — every email tagged `Investment` from the past week, condensed to a couple of sentences with a link back to the source. 
 - **Actions** — turns a matching email into a task with an actual recommendation, not just a copy of the email. Example: `profiles/task_connection.yaml` watches for LinkedIn connection requests and creates a Todoist task like "Set up a meeting with Jane Doe." An investment-tagged email with a material update might produce "Review the deep value thesis of XYZ Company" instead of just landing in your inbox unread.
-- **Exports** — a point-in-time spreadsheet snapshot of matching emails, for when you want to work the data outside the pipeline. Example: `profiles/investment_export.yaml` dumps every `Investment`-tagged email from the past week into an `.xlsx` — sender, summary, link — for offline review or import elsewhere.
+- **Exports** — a point-in-time spreadsheet snapshot of matching emails, for when you want to work the data outside the pipeline. Example: `profiles/job_export.yaml` dumps every email tagged `job_search` or `recruiter` from the last two days into an `.xlsx` — sender, summary, link — for offline review or import elsewhere.
 
 Adding a new digest, action, or export is normally just one new YAML file — no code.
 
@@ -76,7 +76,7 @@ action profile for an already-supported `target`.
 
 ```yaml
 kind: digest
-name: investment_digest
+name: digest_investment
 model: haiku                    # haiku | sonnet
 recipient: summary@kupfer.me    # optional; falls back to DEFAULT_RECIPIENT
 subject_template: "[Investment] Digest — {period_label}"
@@ -98,7 +98,7 @@ inputs:
       ORDER BY cr.received_at DESC LIMIT 200
   - section: Prior Digests     # optional — prior outputs for de-duplication
     source: digests
-    from_profile: investment_digest
+    from_profile: digest_investment
     window_hours: 74            # time-based limit on prior digests fetched
     limit: 5
 prompt: |                       # LAST key — the system prompt for the compose call
@@ -124,6 +124,14 @@ prompt: |                       # LAST key — the system prompt for the compose
 | `window_hours` | digests band | Time-based lookback cap on prior digests fetched |
 | `limit` | digests band | Count cap on prior digests fetched |
 
+**Top-level `dedup_schedule` (optional):** when set, `run_dispatch` skips the
+whole profile if a `DigestRun` already exists since the last scheduled fire
+time — lets a task poll more often than the digest should actually send.
+Currently only `weekly_saturday` (most recent Saturday 05:00 CST) is
+supported (`dispatch._last_schedule_anchor`); e.g.
+`profiles/digest_investment.yaml` sets `dedup_schedule: weekly_saturday` so a
+frequently-polled task still only sends one email per week.
+
 ### Action profile (`kind: action`)
 
 ```yaml
@@ -148,10 +156,15 @@ trigger:
   prior_actions_hours: 74       # aggregate only: lookback for prior ActionRuns context
 todoist:                        # config block NAMED BY `target`
   project: "Professional"
+  section: null                  # optional Todoist section name within the project; not auto-created
+  skip_if: "is_job_alert"        # per_record only: skip task creation when this prompt JSON key is truthy
   priority: 3                   # human scale: 1=most urgent, 4=normal; inverted to Todoist REST scale by todoist_client.py; prompt JSON may override
   labels: [clearfeed]
-  content: "{action} connection request from {name}"
+  forward_due_date: 7             # optional: due date N days out
+  content: "{task_content}"      # placeholders are filled from trigger SQL columns + prompt JSON keys
   description: |
+    Added: {today}
+
     {description}
 prompt: |                       # LAST key — interpolated with record column {placeholders};
   Return STRICT JSON ...        # returned JSON keys become {placeholders} in content/description
@@ -182,18 +195,20 @@ This must be present in `trigger.sql` — `_load_profile` rejects profiles witho
 
 ```yaml
 kind: export
-name: investment_export
+name: job_export
 sql: |
   SELECT cr.id, cr.subject, cr.sender, cr.processed_at, cr.summary,
          cr.body_text, cr.linked_article_url
   FROM ContentRecords cr
   WHERE cr.enrichment_status = 'complete'
-    AND cr.processed_at >= (now() AT TIME ZONE 'America/Chicago') - interval '168 hours'
+    AND cr.processed_at >= (now() AT TIME ZONE 'America/Chicago') - interval '48 hours'
     AND EXISTS (SELECT 1 FROM RecordTerms rt WHERE rt.id = cr.id
-                AND rt.kind = 'label' AND rt.value = 'Investment')
+                AND rt.kind = 'label' AND rt.value = 'Professional')
+    AND EXISTS (SELECT 1 FROM RecordTerms rt2 WHERE rt2.id = cr.id
+                AND rt2.kind = 'tag' AND rt2.value IN ('job_search', 'recruiter'))
   ORDER BY cr.processed_at DESC LIMIT 500
-output_path: "O:\\...\\Exports"
-filename_template: "investment_export_{timestamp}.xlsx"
+output_path: "O:\\...\\Listings"
+filename_template: "job_export_{timestamp}.xlsx"
 ```
 
 Column headers in the Excel output are derived from `cursor.description` (the SQL `SELECT` column names/aliases) — no separate `columns:` list.
@@ -223,14 +238,16 @@ Apply the schema:
 psql -U clearfeed -d clearfeed -f schema_postgres.sql
 ```
 Connection settings (host/port/name/user) are in `src/config.py`; the password
-is a secret in `Secrets/db_keys.py` (`DB_PASSWORD`). To migrate existing
-data from the legacy SQL Server instance, run
-`python scripts/migrate_sqlserver_to_postgres.py`.
+is a secret sourced from `db_keys.py` (`DB_PASSWORD`, see Secrets below).
 
 ### 2. Secrets
-API keys/tokens live in `Secrets/*.py`, imported by `security_config.py`
-(gitignored). Populate `ANTHROPIC_API_KEY`, Gmail OAuth/app-password values,
-`TODOIST_API_TOKEN`, and `DB_PASSWORD`.
+`security_config.py` at the project root (gitignored — not in the repo) is
+the single place secrets/PII are imported into config; `config.py` reads
+values from it and never inlines a secret itself. `security_config.py` in
+turn imports from a `Secrets/` directory that lives **outside the repo**
+(a plain path on your machine, not a project subfolder). Populate
+`ANTHROPIC_API_KEY`, Gmail OAuth/app-password values, `TODOIST_API_TOKEN`,
+and `DB_PASSWORD` there.
 
 ### 3. Gmail API (one-time)
 Enable the Gmail API in Google Cloud Console, create OAuth 2.0 Desktop
@@ -247,13 +264,13 @@ pip install -r requirements.txt
 clearfeed.bat ingest
 
 :: Dispatch a digest
-clearfeed.bat dispatch profiles\investment_digest.yaml
+clearfeed.bat dispatch profiles\digest_investment.yaml
 
 :: Run an action profile (per-record tasks)
 clearfeed.bat action profiles\task_connection.yaml
 
 :: Export to Excel
-clearfeed.bat export profiles\investment_export.yaml
+clearfeed.bat export profiles\job_export.yaml
 
 :: Re-run classify / summarize on stored records (see Reprocess)
 clearfeed.bat reprocess --label Investment
@@ -262,6 +279,12 @@ clearfeed.bat reprocess-summary --all
 :: Full run (tests + ingest + all profiles)
 master.bat
 ```
+
+`master.bat` loops `dispatch.py` over **every** file in `profiles/*.yaml`, not
+just digests; since `dispatch.py` rejects non-`digest` `kind:` profiles, it
+aborts on the first `action`/`export` profile it hits. Use it only while
+`profiles/` holds solely digest profiles, or run `clearfeed.bat dispatch`
+per-profile instead.
 
 ## Reprocess
 
@@ -297,6 +320,15 @@ edits**.
 | `launch_hidden.vbs` | Ingestion_Service | `run_ingestion_service.bat` (orchestrator loop) |
 | `launch_digest.vbs <name>` | the digest tasks | `clearfeed.bat dispatch profiles\<name>.yaml` |
 | `launch_action.vbs <name>` | action tasks | `clearfeed.bat action profiles\<name>.yaml` |
+| `launch_watchdog.vbs` | Ingestion_Watchdog | `scripts/watchdog_ingestion.ps1` (restarts the ingestion service if it stalls) |
+
+`orchestration/ingest.yaml` lists action profiles to run every ingest cycle
+(`post_ingest_actions`). `orchestration/digest.yaml` similarly lists digest
+profiles for `src/digest_orchestrator.py` (`python src/digest_orchestrator.py`)
+to run in one pass; unlike ingest, it isn't currently wired to a scheduled
+task — each digest instead has its own `scripts/tasks/*.xml` entry via
+`launch_digest.vbs`. See [`system_architecture.md`](system_architecture.md)
+for both orchestrators.
 
 ## Configuration
 
@@ -322,7 +354,10 @@ ClearFeed/
 │   ├── llm_client.py         # Anthropic API wrapper + routing
 │   ├── utils.py              # logging, retry, tag norm, read_yaml_profile (shared YAML parse)
 │   ├── ingest_gmail.py       # Stage 1 — ingest + summarize + classify
+│   ├── article_scraper.py    # fetches linked article HTML, appends to body_text at ingest
+│   ├── token_monitor.py      # Gmail OAuth token-health check, run every orchestrator cycle
 │   ├── ingest_orchestrator.py# ingest + post-ingest actions (loop entry)
+│   ├── digest_orchestrator.py# runs every profile in orchestration/digest.yaml (manual entry point)
 │   ├── dispatch.py           # kind: digest — compose + email
 │   ├── action_dispatch.py    # kind: action — per-record tasks; target registry
 │   ├── todoist_client.py     # Todoist REST v1 wrapper
@@ -332,12 +367,13 @@ ClearFeed/
 ├── prompts/                  # ingest-stage prompts only: summarize.md, classify.md
 ├── profiles/                 # one self-contained .yaml per profile
 ├── orchestration/ingest.yaml # post_ingest_actions list
-├── scripts/                  # launchers (.vbs), per-profile + helper .bat, tasks/*.xml
+├── orchestration/digest.yaml # profiles for digest_orchestrator.py
+├── scripts/                  # launchers (.vbs), per-profile + helper .bat, tasks/*.xml, watchdog_ingestion.ps1
 ├── images/                   # downloaded images (gitignored)
 ├── logs/                     # timestamped run logs (gitignored)
 ├── tests/
 ├── schema_postgres.sql       # PostgreSQL DDL (incl. SourceDocuments — full original source)
-├── security_config.py        # imports secrets from Secrets/ — gitignored
+├── security_config.py        # gitignored, project-root; imports secrets from an external Secrets/ dir (not in this repo)
 ├── clearfeed.bat             # stage runner (ingest|dispatch|action|export|reprocess|…)
-└── master.bat                # full pipeline (tests + ingest + dispatch all)
+└── master.bat                # tests + ingest + dispatch every profile in profiles/ (digest-kind only — see note above)
 ```
