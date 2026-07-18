@@ -10,3 +10,4 @@ __pycache__/
 .venv/
 venv/
 task_rights_offering*
+.claude/settings.local.json
