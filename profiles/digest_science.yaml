@@ -1,6 +1,6 @@
 kind: digest
 name: digest_science
-model: haiku
+model: sonnet
 recipient: digests@kupfer.me
 subject_template: 'Science Digest - {period_end_date}'
 dedup_schedule: weekly_saturday
@@ -20,6 +20,8 @@ inputs:
       AND cr.received_at >= (now() AT TIME ZONE 'America/Chicago') - interval '240 hours'
       AND EXISTS (SELECT 1 FROM RecordTerms rt WHERE rt.id = cr.id
                   AND rt.kind = 'label' AND rt.value = 'Science')
+      AND NOT EXISTS (SELECT 1 FROM RecordTerms rt WHERE rt.id = cr.id
+                  AND rt.kind = 'tag' AND rt.value IN ('entertainment', 'music', 'music_rights', 'streaming', 'catalog_sales', 'business', 'startup', 'Pokémon', 'gaming'))
     ORDER BY cr.received_at DESC LIMIT 200
 - section: Prior Digests
   source: digests
@@ -45,7 +47,8 @@ prompt: |
   2. **Reward corroboration.** Findings replicated or confirmed by independent sources rank above single-source claims.
   3. **Short-writeup -> detail.** Each item is a concise writeup linking to an expanded Further Information entry.
   4. **No repeats.** Do not re-report a finding covered in a prior digest unless there is a significant update. When you do, prefix the headline with "Update:" and begin the item body with **Update Summary:** -- <= 50 words (one sentence or short bullets) of only what materially changed.
-  5. **Split multi-topic records.** Break records spanning disparate areas into separate items.
+  5. **Split only along in-scope dimensions.** Break a multi-topic record into separate items only where the resulting items are all in scope for this digest. Out-of-scope facets are dropped, not promoted into their own item. Never create an item whose subject falls outside this digest's scope, even if the source pairs it with in-scope material.
+  6. **Scope is enforced per-facet, not per-record.** A record enters by label, but you report only its in-scope facets. If an in-scope record also carries an out-of-scope angle (market or investment implications, business deals, clinical advice, etc.), report the in-scope facet and omit the rest. Do not reproduce an out-of-scope angle because the source led with it.
 
   ---
 
@@ -53,7 +56,7 @@ prompt: |
 
   Clean HTML email body. **No `<html>`, `<head>`, or `<body>` tags.** Anchor slug: `sci`.
 
-  **Scope:** important science news and major findings -- physics, space, climate, biology, chemistry, materials, mathematics, and non-clinical research.
+  **Scope:** important science news and major findings -- physics, space, climate, biology, chemistry, materials, mathematics, and non-clinical research. Do not consider or report on any investment- or business-oriented content. Commercial, funding, and market-reaction framing are out of scope even when the underlying finding is in scope. 
 
   **Cap at 25.** Include only the **25 most significant** items. Rank by significance of the finding and cross-source corroboration; drop the remainder.
 
@@ -70,7 +73,7 @@ prompt: |
   <h2>Further Information</h2>
   <div id="fi-sci-{n}">
     <h3>{Specific headline}</h3>
-    <p>{<= 600 words. What the sources collectively establish; note replication status and any disagreement. Prose only.}</p>
+    <p>{<= 600 words. What the sources collectively establish within this digest's scope; do not expand into adjacent domains the source touches. Note replication status and any disagreement. Prose only.}</p>
     <p>Sources: <a href="{url_1}" target="_blank">{source 1}</a> – {MM/DD/YYYY}; <a href="{url_2}" target="_blank">{source 2}</a> – {MM/DD/YYYY}</p>
     <p><em>Tags:</em> {comma-separated list of this item's tags}</p>
     <p><a href="#sci-{n}">^ Back</a><br></p>

@@ -89,9 +89,12 @@ prompt: |
   2. **Use legacy records and prior digests for context only** — to detect redundancy, note sentiment shifts, or identify corroboration. If a current record is substantively covered in a prior digest and nothing material has changed, suppress it. If it is covered but new context materially changes the picture, report it with the headline prefixed "Update:" and the item body beginning **Update Summary:** — ≤ 50 words (one sentence or short bullets) of only what materially changed.
   3. **Consolidate** related current records into one item; list sources separately.
   4. **Reward corroboration** — multi-source items rank above single-source.
-  5. **Split** records spanning multiple unrelated asset types/sectors into separate items.
-  6. **Cap at 25.** Report the 25 most significant items; drop the remainder.
-  7. If no current records qualify: `<p><em>Nothing to report.</em></p>`
+  5. **Split only along in-scope dimensions.** Break a record spanning multiple unrelated asset types/sectors into separate items only where each resulting item is in scope. Out-of-scope facets are dropped, not promoted into their own item.
+  6. **Scope is enforced per-facet, not per-record.** A record enters by label, but you report only its in-scope facets. If an in-scope record also carries an out-of-scope angle (market or investment implications, business deals, clinical advice, etc.), report the in-scope facet and omit the rest. Do not reproduce an out-of-scope angle because the source led with it.
+  7. **Cap at 25.** Report the 25 most significant items; drop the remainder.
+  8. **Corporate-news facets belong to the Business digest.** Omit corporate-news, M&A, and leadership angles even when attached to a valid trade idea; report only the asset/trade facet here.
+  9. **Evidence discipline.** A single data point cannot confirm two theses that imply opposite positioning. If one observation is cited toward more than one thesis (e.g. both a bullish “buildout” and a bearish “bubble” thesis), state which it most supports and treat the other as unresolved rather than claiming simultaneous validation.
+  10. If no current records qualify: `<p><em>Nothing to report.</em></p>`
 
   ---
 
@@ -117,7 +120,7 @@ prompt: |
   <h2>Further Information</h2>
   <div id="fi-invt-{n}">
     <h3>{Specific headline — one declarative sentence}</h3>
-    <p>{≤ 600 words. What the sources collectively establish; note replication status and any disagreement. Prose only.}</p>
+    <p>{≤ 600 words. What the sources collectively establish within this digest's scope; do not expand into adjacent domains the source touches. Note replication status and any disagreement. Prose only.}</p>
     <p>Sources: <a href="{url_1}" target="_blank">{source 1}</a> – {MM/DD/YYYY}</p>
     <p><em>Tags:</em> {comma-separated list of this item's tags}</p>
     <p><a href="#invt-{n}">↑ Back</a><br></p>

@@ -1,6 +1,6 @@
 kind: digest
 name: digest_professional
-model: haiku
+model: sonnet
 recipient: digests@kupfer.me
 subject_template: 'Professional Digest - {period_end_date}'
 dedup_schedule: weekly_saturday
@@ -14,7 +14,15 @@ inputs:
     SELECT cr.id, cr.subject, cr.sender, cr.received_at, cr.summary,
            cr.executive_summary, cr.linked_article_url,
            (SELECT STRING_AGG(rt.value, ', ')
-              FROM RecordTerms rt WHERE rt.id = cr.id AND rt.kind = 'tag') AS tags
+              FROM RecordTerms rt
+              WHERE rt.id = cr.id AND rt.kind = 'tag'
+                AND rt.value != 'active_management'
+                AND (
+                  rt.value !~ '^ai_'
+                  OR EXISTS (SELECT 1 FROM RecordTerms rt2
+                             WHERE rt2.id = cr.id AND rt2.kind = 'tag'
+                             AND rt2.value IN ('interview', 'invitation', 'networking', 'career_development', 'connection_request'))
+                )) AS tags
     FROM ContentRecords cr
     WHERE cr.enrichment_status = 'complete'
       AND cr.received_at >= (now() AT TIME ZONE 'America/Chicago') - interval '240 hours'
@@ -47,7 +55,8 @@ prompt: |
   2. **Reward corroboration.** Multi-source items rank above single-source or same-author-repeated items.
   3. **Brief writeup, inline source.** Every item gets a short writeup linking inline to its source. **No Further Information section.**
   4. **No repeats.** Do not re-report an item covered in a prior digest unless there is a significant update. When you do, prefix the headline with "Update:" and begin the item body with **Update Summary:** — ≤ 50 words (one sentence or short bullets) of only what materially changed.
-  5. **Split multi-topic records.** Break records spanning disparate areas into separate items.
+  5. **Split only along in-scope dimensions.** Break a multi-topic record into separate items only where the resulting items are all in scope for this digest. Out-of-scope facets are dropped, not promoted into their own item. Never create an item whose subject falls outside this digest's scope, even if the source pairs it with in-scope material.
+  6. **Scope is enforced per-facet, not per-record.** A record enters by label, but you report only its in-scope facets. If an in-scope record also carries an out-of-scope angle (market or investment implications, business deals, clinical advice, etc.), report the in-scope facet and omit the rest. Do not reproduce an out-of-scope angle because the source led with it.
 
   ---
 
@@ -56,6 +65,8 @@ prompt: |
   Clean HTML email body. **No `<html>`, `<head>`, or `<body>` tags.** Anchor slug: `prof`.
 
   **Exclude job postings entirely.**
+
+  In scope: governance, regulation, leadership, and career-development content directly relevant to the reader's practice. Out of scope: general AI/tech product news, market or investment takes, and job postings — omit these even when a source pairs them with in-scope material.
 
   Brief writeup for **every** qualifying item. No category grouping required; order by importance. No Further Information.
 

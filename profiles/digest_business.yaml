@@ -1,6 +1,6 @@
 kind: digest
 name: digest_business
-model: haiku
+model: sonnet
 recipient: digests@kupfer.me
 subject_template: 'Business Digest - {period_end_date}'
 dedup_schedule: weekly_saturday
@@ -50,7 +50,7 @@ prompt: |
 
   In scope (corporate/industry news): mergers & acquisitions, IPOs and spinoffs, executive and board changes, antitrust and regulatory action, layoffs and restructuring, supply-chain developments, and broad industry trends.
 
-  Out of scope (route to the Investment digest — omit here): trade ideas, price targets, valuation calls, portfolio positioning, and macro/markets commentary. If a record is purely a market/trading take with no corporate-news angle, drop it.
+  Out of scope (route to the Investment digest — omit here): trade ideas, price targets, valuation calls, portfolio positioning, and macro/markets commentary. If a record is purely a market/trading take with no corporate-news angle, drop it. If a record is mixed (corporate news plus a trade idea), report only the corporate-news facet; strip price targets, valuation calls, and positioning.
 
   ---
 
@@ -60,7 +60,8 @@ prompt: |
   2. **Reward corroboration.** Items confirmed by multiple *independent* sources rank above single-source items.
   3. **Short-writeup -> detail.** Each item is a concise writeup linking to an expanded Further Information entry.
   4. **No repeats.** Do not re-report an item covered in a prior digest unless there is a significant update or change. When you do, prefix the headline with "Update:" and begin the item body with **Update Summary:** -- <= 50 words (one sentence or short bullets) of only what materially changed.
-  5. **Split multi-topic records.** Break any record spanning disparate areas into separate items.
+  5. **Split only along in-scope dimensions.** Break a multi-topic record into separate items only where the resulting items are all in scope for this digest. Out-of-scope facets are dropped, not promoted into their own item. Never create an item whose subject falls outside this digest's scope, even if the source pairs it with in-scope material.
+  6. **Scope is enforced per-facet, not per-record.** A record enters by label, but you report only its in-scope facets. If an in-scope record also carries an out-of-scope angle (market or investment implications, business deals, clinical advice, etc.), report the in-scope facet and omit the rest. Do not reproduce an out-of-scope angle because the source led with it.
   6. **Cap at 25.** Report the 25 most significant items; drop the remainder.
 
   ---
@@ -84,7 +85,7 @@ prompt: |
   <h2>Further Information</h2>
   <div id="fi-biz-{n}">
     <h3>{Specific headline -- one declarative sentence}</h3>
-    <p>{Expanded synthesis <= 600 words. State what the sources collectively establish; note any disagreement. Prose only.}</p>
+    <p>{Expanded synthesis <= 600 words. State what the sources collectively establish within this digest's scope; do not expand into adjacent domains the source touches. Note any disagreement. Prose only.}</p>
     <p>Sources: <a href="{url_1}" target="_blank">{source 1}</a> – {MM/DD/YYYY}; <a href="{url_2}" target="_blank">{source 2}</a> – {MM/DD/YYYY}</p>
     <p><em>Tags:</em> {comma-separated list of this item's tags}</p>
     <p><a href="#biz-{n}">^ Back</a><br></p>
