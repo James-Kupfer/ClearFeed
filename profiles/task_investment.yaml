@@ -45,7 +45,7 @@ todoist:
     ---
     **Sources:** {sources}
     **Sent:** {source_dates}
-    *task_investment v16*
+    *task_investment v17*
 
 # --- Prompt ---
 # Receives {records_json} (JSON array of current records) and {prior_actions_json}
