@@ -45,7 +45,7 @@ DIGEST_PDF_MARGIN_LR_IN = 0.20   # left/right margin
 EMAIL_MAX_THREADS = 100             # cap per query per ingest run
 EMAIL_INGEST_LOOKBACK_DAYS = 90   # inbox lookback window — emails older than this are ignored
 EMAIL_TRASH_LOOKBACK_DAYS = 30    # how far back to sweep threads in Trash
-INGEST_POLL_INTERVAL_MINUTES = 15 # polling interval used by run_ingestion.bat
+INGEST_POLL_INTERVAL_MINUTES = 120 # polling interval used by run_ingestion.bat
 INGEST_DRY_RUN_LIMIT = 10         # default thread cap for --dry-run mode
 PROCESSED_LABEL = "ProcessedClearFeed"  # marks a thread as fully ingested
 

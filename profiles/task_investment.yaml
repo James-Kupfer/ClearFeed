@@ -60,26 +60,49 @@ prompt: |
 
   ## CLASSIFICATION TAXONOMY
 
-  Classify each action by **Type** and **Sector/Industry**:
+  Classify each action by **Type**, **Sector**, and **Industry**. Sector names can repeat across
+  Types with different meanings (e.g. "Materials" under Commodity is the raw-materials complex;
+  under Equity it is materials-sector stocks) — always pick the Sector/Industry from within the
+  matching Type below, never mix industries across Types.
 
-  **Types:** Fixed-Income | Commodity | Crypto | Equity | Private
+  **Types:** Commodity | Crypto | Equity | Fixed-Income | Miscellaneous | Macro | Private
 
-  **Sectors and Industries:**
+  **Commodity sectors:**
+  - **Diversified Commodities:** Diversified Commodities
+  - **Non-Diversified Commodities:** Agricultural Commodities
+  - **Energy:** Diversified Energy · Oil & Gas E&P – Major · Oil & Gas E&P – Junior · Oil & Gas Equipment & Services · Oil & Gas Midstream · Renewable Energy · Royalty · Specialty Processing
+  - **Materials:** Chemicals · Diversified Materials · Precious Metals & Minerals
+  - **Mining:** Diversified Mining · Exploration · Metals & Mining · Royalty
 
-  - **Energy:** Oil & Gas E&P · Oil & Gas Midstream · Oil & Gas Refining & Marketing · Oil & Gas Equipment & Services · Coal & Consumable Fuels · Renewable Energy
-  - **Materials:** Chemicals · Construction Materials · Containers & Packaging · Metals & Mining · Paper & Forest Products · Precious Metals & Minerals
-  - **Industrials:** Aerospace & Defense · Building Products · Construction & Engineering · Electrical Equipment · Industrial Conglomerates · Machinery · Trading Companies & Distributors · Commercial Services & Supplies · Professional Services · Air Freight & Logistics · Airlines · Marine · Road & Rail · Transportation Infrastructure
-  - **Consumer Discretionary:** Auto Components · Automobiles · Household Durables · Leisure Products · Textiles, Apparel & Luxury Goods · Hotels, Restaurants & Leisure · Diversified Consumer Services · Media · Interactive Media & Services · Distributors · Internet & Direct Marketing Retail · Multiline Retail · Specialty Retail
-  - **Consumer Staples:** Food & Staples Retailing · Food Products · Beverages · Tobacco · Household Products · Personal Products
-  - **Health Care:** Health Care Equipment & Supplies · Health Care Providers & Services · Health Care Technology · Biotechnology · Pharmaceuticals · Life Sciences Tools & Services
-  - **Financials:** Banks · Thrifts & Mortgage Finance · Diversified Financial Services · Consumer Finance · Capital Markets · Mortgage REITs · Insurance
-  - **Information Technology:** IT Services · Software · Communications Equipment · Technology Hardware · Semiconductors · Electronic Equipment & Components
-  - **Communication Services:** Diversified Telecommunication Services · Wireless Telecommunication Services · Entertainment · Interactive Home Entertainment
-  - **Utilities:** Electric Utilities · Gas Utilities · Multi-Utilities · Water Utilities · Independent Power Producers
-  - **Real Estate:** Diversified REITs · Industrial REITs · Hotel & Resort REITs · Office REITs · Health Care REITs · Residential REITs · Retail REITs · Specialized REITs · Real Estate Management & Development
+  **Crypto sectors:**
+  - **Crypto:** Crypto · Diversified Crypto
+
+  **Equity sectors:**
+  - **Communication Services:** Diversified Communication Services · Diversified Telecommunication Services · Wireless Telecommunication Services
+  - **Consumer Discretionary:** Automotive · Diversified Consumer Discretionary · Hotels, Restaurants & Leisure · Household Durables · Interactive Media & Services · Internet & Direct Marketing Retail · Media · Specialty Retail · Textiles, Apparel & Luxury Goods
+  - **Consumer Staples:** Diversified Consumer Staples · Food & Staples
+  - **Diversified:** Conglomerate · Short Fund
+  - **Emerging Markets:** Country Fund · Diversified Emerging Markets
+  - **Financials:** Banks · Capital Markets · Consumer Finance · Diversified Financials · Insurance · Litigation Management
+  - **Health Care:** Biotechnology · Diversified Health Care · Health Care Equipment & Supplies · Health Care Providers & Services · Pharmaceuticals
+  - **Industrials:** Aerospace & Defense · Airlines · Commercial Services & Supplies · Construction & Engineering · Diversified Industrials · Electrical Equipment · Machinery · Marine · Professional Services · Transportation
+  - **Miscellaneous:** Miscellaneous · Tail Risk
+  - **Real Estate:** Diversified Real Estate · Real Estate Management & Development
+  - **Special Situation:** Litigation Claim · Other Special Situation · Short Fund
+  - **Technology:** Diversified Technology · Electronic Equipment & Components · Robotics · Semiconductors · Software
+  - **Utilities:** Diversified Utilities
+
+  **Fixed-Income sectors:**
+  - **Bond:** Aggregate Bond · Short Term Bond · Long-Term Bond
+
+  **Miscellaneous sectors:**
+  - **Miscellaneous:** Forecast Contract
+
+  **Macro sectors:**
   - **Macro / Multi-Sector:** Central Bank & Monetary Policy · Fiscal Policy & Government Debt · Currency & FX · Global Trade & Tariffs · Geopolitical Risk · Commodities Complex · Credit Markets · Multi-Asset
 
-  For Fixed-Income: sector = bond type (e.g., Treasuries, High Yield). For Commodity: sector = commodity group. For Crypto: sector = crypto category. For Private: sector = Private Equity · Venture Capital · Private Credit · Real Assets.
+  **Private sectors:**
+  - **Private:** Private Equity · Venture Capital · Private Credit · Real Assets
 
   ---
 

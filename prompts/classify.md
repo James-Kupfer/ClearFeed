@@ -101,6 +101,84 @@ Good: "Actionable withheld: item is market commentary, no directed action. Tags 
 Poor: "It's a tech newsletter so it's Technology."
 </rationale>
 
+<worked_examples>
+Three end-to-end examples pulled from actual ClearFeed ingest history, anchoring the boundary rules above against real classification output.
+
+Example 1 — Business vs. Politics, market/analytical framing wins (real ClearFeed record).
+Summary: "Doomberg's article 'Sources and Methods' examines how to analyze the Ukraine-Russia energy war amid competing propaganda narratives. The piece opens with the premise that global hydrocarbon flows are central to understanding the conflict, and that energy analysts must develop propaganda-detection skills alongside technical expertise.\n\nThe author illustrates this challenge using a June 18 drone attack on a Moscow refinery. The Financial Times characterized it as a spectacular success—Ukraine launched nearly 200 drones, striking Russia's largest refinery with dramatic visual effects. However, pro-Russian sources like Simplicius's Substack alleged the visual spectacle was manufactured: drones were allegedly filled with kerosene to produce thick, 'Hollywood-style' plumes of smoke, exaggerating impact for propaganda effect.\n\nWeeks later, Reuters reported Russia importing 400,000 tons of gasoline monthly to cover shortages—a direct result of Ukraine's attacks. Doomberg recasts the volumes: 400,000 tons/month ≈ 115,000 barrels/day against 935,000 barrels/day peak summer demand, meaning ~12% of peak demand. The author questions whether this is unusual, citing Alexander Mercouris (The Duran YouTube channel), who claims Russia regularly imports gasoline seasonally due to refinery distribution across former Soviet republics. UN trade data partially validates Mercouris: Russia does import gasoline semi-regularly. However, the scale of 2026 purchases and need for Indian supplements suggest Ukraine's attacks have caused measurable damage.\n\nDoomberg's verdict: drone attacks are 'a manageable nuisance' for Putin, but the analytical methodology matters more than the conclusion. The author emphasizes showing one's work and evaluating sources based on consistency and accuracy, not nationality or pedigree.\n\nThe article closes with a warning about EU information restrictions. Following the 2022 Russian invasion, the EU banned broadcasting and distribution of RT, Sputnik, and other state-aligned outlets via television, online platforms, and apps. A recent EU Court of Justice ruling in a German criminal case expanded the ban's scope dramatically: any person responsible—directly or indirectly, paid or unpaid, for any duration—for making prohibited content available violates sanctions. Doomberg notes this likely makes even quoting RT in criticism illegal under a strict reading.\n\nDoomberg consulted Perplexity AI, which advised US-based analysts with EU readers to avoid republishing RT material, instead paraphrasing and attributing to 'Russian state media.' The author expresses concern that sources like Simplicius and The Duran may face similar pressure and platform removal as their audiences grow—ironically, as their accuracy improves."
+Reasoning: geopolitical and energy-market content framed around hydrocarbon flows and source-evaluation methodology, not civic/governmental news — Business per the Business vs Politics boundary rule, with a secondary method/epistemology tag cluster. No directed action for the reader — commentary and analysis only, actionable withheld.
+```json
+{
+  "tags": [
+    "geopolitical",
+    "energy",
+    "sanctions",
+    "regulation",
+    "ukraine_russia",
+    "refinery",
+    "oil_gas",
+    "information_control",
+    "eu_policy",
+    "propaganda",
+    "analytical_methodology",
+    "source_evaluation",
+    "newsletter"
+  ],
+  "classification_rationale": "Actionable withheld: item is analytical commentary and methodology guidance, not a directed task, decision, or deadline for the reader. No financial signal, RSVP, or concrete action requested. Tags: geopolitical, energy, sanctions, regulation, ukraine_russia, refinery, oil_gas, information_control, eu_policy (all geopolitical-framing cluster) from the conflict analysis, energy-flow focus, and EU broadcast ban discussion; propaganda, analytical_methodology, source_evaluation (method/epistemology cluster) from the core theme of detecting misinformation and weighing sources; newsletter (format, not counted toward labels). No invented tags. Labels: Purpose — no Spam (analysis, not a product pitch), no Personal or Professional framing.",
+  "labels": [
+    "Business"
+  ],
+  "classification_confidence": 4
+}
+```
+
+Example 2 — actionable hard override (job posting) beats a rich, detailed listing (real ClearFeed record).
+Summary: "LinkedIn Job Alert email (dated 6/15/26) sent to James Kupfer (profile: AI Platform Architect • Multi-Agent Orchestration • AI Governance in Financial Services). Alert matches his saved search for senior AI engineering and architecture roles: \"Principal AI Engineer\" OR \"Staff AI Engineer\" OR \"Lead AI Engineer\" OR \"Staff AI Platform Engineer\" OR \"Principal AI Architect\" OR \"Lead AI Architect\" OR \"Principal Machine Learning Engineer\" OR \"Staff Machine Learning Engineer\", filtered by Financial Services industry and Remote/Hybrid location in Austin area. Email reports 30+ new jobs matching these criteria. Six specific roles are highlighted with links: (1) AI Technical Lead – GenAI & Agentic AI at Moder (United States, flagged as \"Top applicant\"); (2) Principal AI Engineer at Risepoint (United States, Remote, 5 company alumni); (3) Staff Backend Engineer (AI Platform Team) at Ladders (United States, Remote, $185K–$218K/year); (4) Principal Software Engineer, AI & Matching at Bumble Inc. (Austin, TX, Hybrid, $280K–$320K/year, 2 company alumni); (5) Lead AI Solutions Delivery Engineer at Docusign (United States, Remote, actively recruiting); (6) AI Platform Engineer at Annapurna (United States, Remote, actively recruiting, fast-growing, Easy Apply). All job postings are linked via LinkedIn tracking URLs. Email footer includes manage alerts, unsubscribe, and help links. Security footer personalizes the message with recipient name and headline to distinguish from phishing. Linked content pages (attempted fetches) all returned LinkedIn sign-in pages without job detail text, indicating paywalled or authentication-required content. One linked article provided LinkedIn Help documentation on security footer messages in emails, explaining their anti-phishing purpose."
+Reasoning: a LinkedIn Job Alert with six highlighted roles, salary figures, and apply links has every surface feature of actionable — but the job-posting/recruitment hard override applies regardless of how detailed or matched the listing is. Purpose is Professional (recruiting/job-search content) — stop at step 2 of the decision order, no subject label added.
+```json
+{
+  "tags": [
+    "job_search",
+    "recruiter",
+    "ai_engineering",
+    "ai_architecture",
+    "platform_engineering",
+    "genai",
+    "agentic_ai",
+    "financial_services",
+    "remote_work",
+    "austin",
+    "senior_roles",
+    "newsletter"
+  ],
+  "classification_rationale": "Actionable withheld: hard override — job postings are never actionable regardless of deadline, application step, or call to apply. This is a LinkedIn Job Alert notification delivering 30+ matching roles to a user with a saved search for senior AI engineer/architect positions (Principal, Staff, Lead titles) in Financial Services, Remote/Hybrid, Austin area. Six roles are highlighted with links. Tags reflect: job_search and recruiter (delivery mechanism and intent); ai_engineering, ai_architecture, platform_engineering, genai, agentic_ai (job titles and specializations); financial_services, remote_work, austin (filtering criteria); senior_roles (Principal/Staff/Lead seniority); newsletter (format — automated alert). No invented tags.",
+  "labels": [
+    "Professional"
+  ],
+  "classification_confidence": 5
+}
+```
+
+Example 3 — Personal admin, actionable applies to a real dated deadline (real ClearFeed record).
+Summary: "This is an automated email from Login.gov (no-reply@login.gov), sent 2026-06-29 at 11:27:51 UTC, confirming that a user has submitted an email address for registration. The message contains a confirmation link (valid for 24 hours) that the user must click or paste into a browser to complete email verification. The link includes a request ID (19d0bda2-28da-45f0-8383-40c2cc58313f) and confirmation token (xs6RdZ1JHyRzBYJs2Jeh). The email includes footer links to the Login.gov help center and privacy policy and directs users not to reply to the message.\n\nWhen the confirmation link is accessed, it directs to a secure.login.gov page where the system indicates the email address has already been confirmed and prompts the user to sign in. The page displays a sign-in form (email address and password fields), an option to sign in with a government employee ID, a password recovery link, and a 1-second auto-logout timer with options to \"keep me signed in\" or \"sign me out.\" The page is protected by reCAPTCHA and includes language options (English, Spanish, French, Simplified Chinese).\n\nLogin.gov is a U.S. General Services Administration (GSA) service that provides a single unified account for secure, private access to multiple participating federal government agencies. It is operated by the GSA and managed as a public-facing digital identity platform serving both individual users and government agency partners. The platform handles software development, security operations, and customer support on behalf of partner agencies.\n\nLogin.gov offers multiple authentication methods including face/touch unlock, authentication applications, security keys, text/SMS or phone call codes, backup codes, and government employee ID. The help center (login.gov/help/) covers account creation, sign-in troubleshooting, account management (password, email, phone number, authentication methods), identity verification (document photos, selfies, address verification by mail or in-person at Post Offices), support for specific agencies (IRS, Medicare.gov, Social Security Administration, Trusted Traveler Programs, OPM Retirement Services, System for Award Management), and fraud protection guidance including reporting suspicious activity and recognizing common scams.\n\nThe system includes account security features such as account lockout detection, reCAPTCHA protection, and safeguards against unauthorized one-time code requests. Users can manage duplicate accounts, relink accounts with partner agencies, deactivate or delete accounts, and verify identity through multiple methods. The platform supports international phone numbers and is available in multiple languages."
+Reasoning: a government-account confirmation link with a 24-hour deadline is the reader's own admin/obligation — Personal, not a purpose or topical vacuum. The concrete deadline plus a required click-through action meets the "concrete task, decision, reply, or deadline directed at the reader" trigger for actionable.
+```json
+{
+  "tags": [
+    "actionable",
+    "civic_admin",
+    "receipt"
+  ],
+  "classification_rationale": "Actionable: applied. The summary describes an automated transactional email from Login.gov containing a confirmation link with a 24-hour deadline that the user must click to complete email verification and access their federal account. This is a concrete, time-bound task directed at the reader. No hard overrides apply (not a job posting, not a security vulnerability disclosure per se, but rather a confirmation request the user initiated). Tags: civic_admin and receipt reflect the transactional, government-account-administration nature of this message. No topical (Business, Technology, Science, Health, Politics, Culture) tags apply — the summary describes account setup mechanics, not a market signal, tech product/policy, research, health guidance, political news, or cultural content. No Spam signal: this is an unsolicited transactional confirmation the user requested, not a promotional pitch.",
+  "labels": [
+    "Personal"
+  ],
+  "classification_confidence": 5
+}
+```
+
+</worked_examples>
+
 <tag_registry>
 
 ### Handling

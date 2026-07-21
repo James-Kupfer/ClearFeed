@@ -46,6 +46,8 @@ class AnthropicBackend:
         )
         self.last_input_tokens: int = 0
         self.last_output_tokens: int = 0
+        self.last_cache_read_tokens: int = 0
+        self.last_cache_creation_tokens: int = 0
         self.last_model_id: str = ""
 
     @retry(
@@ -61,16 +63,36 @@ class AnthropicBackend:
         Streaming is used for all calls so large max_tokens (digests can run to tens
         of thousands of output tokens) don't hit the SDK's non-streaming HTTP timeout.
         """
+        # Static system prompts (summarize/classify/digest) are byte-identical across
+        # many calls — mark the block cacheable so repeat calls within the 5-minute
+        # TTL read at 10% of input cost instead of paying full price each time.
+        system_param = (
+            [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
+            if system
+            else []
+        )
         with self._client.messages.stream(
             model=model_id,
             max_tokens=max_tokens,
-            system=system,
+            system=system_param,
             messages=[{"role": "user", "content": prompt}],
         ) as stream:
             message = stream.get_final_message()
         self.last_input_tokens = message.usage.input_tokens
         self.last_output_tokens = message.usage.output_tokens
+        self.last_cache_read_tokens = getattr(message.usage, "cache_read_input_tokens", 0) or 0
+        self.last_cache_creation_tokens = (
+            getattr(message.usage, "cache_creation_input_tokens", 0) or 0
+        )
         self.last_model_id = model_id
+        log.debug(
+            "LLM usage: model=%s input=%d output=%d cache_read=%d cache_creation=%d",
+            model_id,
+            self.last_input_tokens,
+            self.last_output_tokens,
+            self.last_cache_read_tokens,
+            self.last_cache_creation_tokens,
+        )
         if message.stop_reason == "max_tokens":
             log.warning(
                 "LLM output hit max_tokens=%d for model=%s — response was truncated",
@@ -108,12 +130,16 @@ class LLMClient:
         self._max_tokens = max_tokens
         self._accum_input: int = 0
         self._accum_output: int = 0
+        self._accum_cache_read: int = 0
+        self._accum_cache_creation: int = 0
         self._last_model_id: str = ""
 
     def reset_usage(self) -> None:
         """Reset accumulated token counters. Call before a classify chain."""
         self._accum_input = 0
         self._accum_output = 0
+        self._accum_cache_read = 0
+        self._accum_cache_creation = 0
         self._last_model_id = ""
 
     def consume_usage(self) -> tuple[str | None, int]:
@@ -125,9 +151,19 @@ class LLMClient:
         if hasattr(self._backend, "last_model_id"):
             self._accum_input += getattr(self._backend, "last_input_tokens", 0)
             self._accum_output += getattr(self._backend, "last_output_tokens", 0)
+            self._accum_cache_read += getattr(self._backend, "last_cache_read_tokens", 0)
+            self._accum_cache_creation += getattr(self._backend, "last_cache_creation_tokens", 0)
             self._last_model_id = getattr(self._backend, "last_model_id", "") or self._last_model_id
         total = self._accum_input + self._accum_output
         return self._last_model_id or None, total
+
+    def consume_cache_usage(self) -> tuple[int, int]:
+        """Return (cache_read_tokens, cache_creation_tokens) accumulated since last reset_usage().
+
+        Call after consume_usage() in the same accounting window — both read from
+        the same accumulators, populated by consume_usage()'s backend read.
+        """
+        return self._accum_cache_read, self._accum_cache_creation
 
     def call(
         self,
