@@ -13,6 +13,12 @@ protect against a duplicate loop, because that task's wscript.exe launcher actio
 is fire-and-forget and exits within milliseconds of detaching the real loop, so a
 naive timer-based relaunch could easily double the loop. See
 system_architecture.md for the full explanation.
+
+When more than one loop is found, this script trims the duplicates itself: it
+keeps the oldest (the presumed original) and kills the rest. This is safe even
+though it's not "blind" launching -- it only ever removes processes it already
+confirmed are excess copies of the same script, never starts a new one in this
+branch, so it can't itself cause the doubling described above.
 #>
 
 $ErrorActionPreference = 'Stop'
@@ -51,7 +57,18 @@ try {
 
     if ($matches.Count -gt 1) {
         $pidList = ($matches | ForEach-Object { $_.ProcessId }) -join ', '
-        Write-WatchLog "WARNING multiple ingestion loops detected (PIDs: $pidList) -- leaving them alone, needs manual cleanup"
+        $sorted = $matches | Sort-Object CreationDate
+        $survivor = $sorted[0]
+        $duplicates = $sorted | Select-Object -Skip 1
+        Write-WatchLog "WARNING multiple ingestion loops detected (PIDs: $pidList) -- keeping oldest PID $($survivor.ProcessId), killing duplicate(s)"
+        foreach ($dup in $duplicates) {
+            try {
+                & taskkill.exe /PID $dup.ProcessId /T /F | Out-Null
+                Write-WatchLog "Killed duplicate ingestion loop PID $($dup.ProcessId)"
+            } catch {
+                Write-WatchLog "ERROR failed to kill duplicate ingestion loop PID $($dup.ProcessId): $($_.Exception.Message)"
+            }
+        }
         return
     }
 
