@@ -19,6 +19,11 @@ trigger:
                   AND rt.kind = 'label' AND rt.value = 'Professional')
       AND EXISTS (SELECT 1 FROM RecordTerms rt2 WHERE rt2.id = cr.id
                   AND rt2.kind = 'tag' AND rt2.value = 'actionable')
+      -- LinkedIn connection requests also earn the actionable tag (per
+      -- classify.md) but are exclusively task_connection's domain — exclude
+      -- them here so the same email doesn't spawn two Todoist tasks.
+      AND NOT EXISTS (SELECT 1 FROM RecordTerms rt3 WHERE rt3.id = cr.id
+                  AND rt3.kind = 'tag' AND rt3.value = 'connection_request')
     ORDER BY cr.processed_at DESC LIMIT 50
 
 # --- Todoist task mapping ---
