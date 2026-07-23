@@ -514,12 +514,18 @@ def _run_aggregate(
     )
 
     # LLM failure → no ActionRuns written; batch retries next run
+    # Aggregate mode composes many records into potentially many verbose
+    # actions in one response — a digest-scale output, not a single-record
+    # one — so it needs the digest token budget, not the per-record default.
+    # Undersizing this silently truncates the JSON response every cycle: the
+    # call raises, no ActionRuns get written (created/skipped/failed alike),
+    # and the same un-deduped backlog gets resent and re-truncated forever.
     try:
         result = llm.call_json(
             "action",
             prompt_text,
             model_override=profile.get("model"),
-            max_tokens=config.LLM_MAX_TOKENS,
+            max_tokens=config.DIGEST_MAX_TOKENS,
         )
     except Exception as exc:
         log.error("[aggregate] LLM call failed — no ActionRuns written: %s", exc)
