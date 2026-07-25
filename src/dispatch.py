@@ -205,7 +205,7 @@ def run_dispatch(profile_path: str | Path) -> None:
             profile_name=profile["name"],
             period_start=period_start,
             period_end=period_end,
-            summary_text=html_body,
+            summary_text=_trim_for_reuse(html_body),
             content_ids=content_ids,
             prior_digest_ids=prior_digest_ids,
         )
@@ -356,6 +356,30 @@ def _normalize_list(values: list[str] | None) -> list[str] | None:
     if not values:
         return None
     return [normalize_tag(v) for v in values]
+
+
+# Matches the "Further Information" section that Format-A digest profiles
+# (investment, business, technology, science, miscellaneous) append after the
+# item list — see the OUTPUT STRUCTURE section of those profiles' prompts.
+_FURTHER_INFO_RE = re.compile(
+    r"<hr[^>]*>\s*<h2>\s*Further Information\s*</h2>.*", re.IGNORECASE | re.DOTALL
+)
+
+
+def _trim_for_reuse(html_body: str) -> str:
+    """Reduce a digest body to what future runs need for de-duplication.
+
+    DigestRuns.summary_text is re-injected verbatim into the next digest's
+    prior-digest band (see _build_prompt) so the model can recognize
+    already-covered topics. The brief item list already carries enough
+    signal for that (headline + 2-4 sentence writeup per item); the
+    Further Information section is elaboration prose the dedup pass never
+    needs, and it's the large majority of a digest's size. Stripping it here
+    only affects what's stored for reuse — the emailed html_body is
+    untouched. Format-B digests (personal, professional) have no Further
+    Information section, so this is a no-op for them.
+    """
+    return _FURTHER_INFO_RE.sub("", html_body).rstrip()
 
 
 def _build_prompt(

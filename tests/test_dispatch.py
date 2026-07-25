@@ -32,6 +32,33 @@ def test_normalize_list_returns_none_for_empty():
     assert _normalize_list(None) is None
 
 
+def test_trim_for_reuse_strips_further_information_section():
+    from dispatch import _trim_for_reuse
+
+    html = (
+        '<div class="item" id="invt-1"><p><strong>Headline.</strong> Brief writeup. '
+        '<a href="#fi-invt-1">→ Further detail</a></p></div>\n'
+        '<hr style="border: none; border-top: 8px double #333; margin: 32px 0;">\n'
+        "<h2>Further Information</h2>\n"
+        '<div id="fi-invt-1"><h3>Headline</h3><p>Long elaboration prose.</p></div>\n'
+    )
+    trimmed = _trim_for_reuse(html)
+    assert "Brief writeup" in trimmed
+    assert "Further Information" not in trimmed
+    assert "Long elaboration prose" not in trimmed
+
+
+def test_trim_for_reuse_is_noop_without_further_information():
+    from dispatch import _trim_for_reuse
+
+    html = (
+        '<div class="item" id="pers-1"><p><strong>Headline.</strong> Brief writeup. '
+        '<em>Source: <a href="https://example.com">Example</a> – 06/20/2026.</em></p>'
+        '<p><em>Tags:</em> gardening</p></div>'
+    )
+    assert _trim_for_reuse(html) == html
+
+
 def test_compute_tag_freq_handles_comma_string():
     """Tags returned as STRING_AGG comma-strings must be split and counted."""
     from dispatch import _compute_tag_freq
