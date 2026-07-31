@@ -72,7 +72,8 @@ BUCKET_LABELS = [  # Gmail labels auto-created at ingest startup. "Spam" is excl
 # --- LLM ---
 MODEL_IDS = {
     "haiku": "claude-haiku-4-5-20251001",
-    "sonnet": "claude-sonnet-4-6",
+    "sonnet": "claude-sonnet-5",
+    "opus": "claude-opus-5",
 }
 LLM_ROUTING = {
     "summarize": "haiku",  # body_text -> summary + summary_confidence/rationale at ingest
@@ -80,16 +81,34 @@ LLM_ROUTING = {
     "digest": "haiku",  # short-window digest compose
     "synthesis": "sonnet",  # cross-period synthesis compose
 }
-# Max output tokens. Haiku 4.5 and Sonnet 4.6 both support up to 64,000 output
-# tokens. Calls stream (see llm_client), so large values don't risk HTTP timeouts.
+# Max output tokens. Haiku 4.5 supports up to 64,000; Sonnet 5 and Opus 5 both
+# support up to 128,000. Calls stream (see llm_client), so large values don't
+# risk HTTP timeouts.
 LLM_MAX_TOKENS = 16000      # default for classify/summarize (small/medium outputs)
 DIGEST_MAX_TOKENS = 32000   # digest/synthesis compose — long HTML bodies with many items
+# Action-dispatch prompt calls (task_*.yaml profiles) route through the "action" operation
+# on config.LLM_ROUTING["action"] (sonnet by default). LLM_MAX_TOKENS (16000) was too small
+# here: Sonnet 5's extended-thinking output alone could exhaust it before any JSON text was
+# emitted, so aggregate profiles like task_investment silently produced zero ActionRuns every
+# cycle (stop_reason=max_tokens, no text block at all). Match the digest budget.
+ACTION_MAX_TOKENS = 32000
 # Auto-escalation: when the primary classify call returns classification_confidence at or
 # below CLASSIFY_ESCALATION_THRESHOLD, re-run classify on the same input with
 # CLASSIFY_ESCALATION_MODEL and use that result. Set THRESHOLD to 0 to disable.
 # The summarize step is Haiku-only and never escalates.
 CLASSIFY_ESCALATION_THRESHOLD = 2
 CLASSIFY_ESCALATION_MODEL = "sonnet"
+# Second escalation trigger, independent of confidence/Miscellaneous: a Business-labeled
+# record carrying one of these high-precision trade-signal tags but withholding `actionable`
+# gets a Sonnet second opinion. Guards against Haiku silently under-triggering `actionable`
+# on genuine trade content (missed a first-person short disclosure in July 2026 — see
+# classify.md worked examples 4-6). Keep this list high-precision (registry tags that mean
+# "this is a trade idea/corporate action", not broad macro tags like `rates` or `momentum`
+# that correctly appear on non-actionable commentary too).
+CLASSIFY_ACTIONABLE_REVIEW_TAGS = frozenset({
+    "trade_alert", "options", "insider_activity", "merger_arb", "arbitrage",
+    "special_situations", "rights_offering", "spinoff",
+})
 LLM_RETRY_ATTEMPTS = 3
 LLM_RETRY_BASE_DELAY = 2.0  # seconds; delay before retry N = base * 2**N
 LLM_TIMEOUT_SECONDS = 600  # streaming read timeout; matches SDK default but explicit so a

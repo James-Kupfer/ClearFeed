@@ -260,12 +260,15 @@ def classify_with_escalation(
     user_prompt: str,
     context: str,
 ) -> tuple[dict, int | None, bool, str | None, int | None]:
-    """Run classify; escalate to the escalation model when confidence is low or label is Miscellaneous.
+    """Run classify; escalate to the escalation model when confidence is low, label is
+    Miscellaneous, or `actionable` may have been missed on genuine trade content.
 
     Reads the classify-step `classification_confidence` field. Escalation triggers
-    when either condition holds (OR):
+    when any condition holds (OR):
     - classification_confidence is not NULL and is at or below CLASSIFY_ESCALATION_THRESHOLD (set to 0 to disable)
     - any assigned label is Miscellaneous (always escalates, regardless of threshold)
+    - label includes Business, `actionable` was withheld, and a high-precision trade-signal
+      tag from config.CLASSIFY_ACTIONABLE_REVIEW_TAGS is present (see config for rationale)
 
     Returns (classify_result, classification_confidence, escalated, classify_model, classify_tokens).
     classify_model is the full model ID of the final call; classify_tokens is the
@@ -278,6 +281,7 @@ def classify_with_escalation(
         result.get("classification_confidence"), context, field="classification_confidence"
     )
     initial_labels = result.get("labels", [])
+    initial_tags = [tag.lower() for tag in result.get("tags", [])]
 
     logging.info(
         "[classify] %s → labels=%s classification_confidence=%s",
@@ -291,13 +295,21 @@ def classify_with_escalation(
 
     escalate_low_conf = threshold > 0 and confidence is not None and confidence <= threshold
     escalate_misc = "miscellaneous" in raw_labels
+    missed_actionable_tags = (
+        set(initial_tags) & config.CLASSIFY_ACTIONABLE_REVIEW_TAGS
+        if "business" in raw_labels and "actionable" not in initial_tags
+        else set()
+    )
+    escalate_missed_actionable = bool(missed_actionable_tags)
 
-    if escalate_low_conf or escalate_misc:
+    if escalate_low_conf or escalate_misc or escalate_missed_actionable:
         reasons = []
         if escalate_low_conf:
             reasons.append(f"low confidence ({confidence} <= {threshold})")
         if escalate_misc:
             reasons.append("Miscellaneous label")
+        if escalate_missed_actionable:
+            reasons.append(f"possible missed actionable (tags={sorted(missed_actionable_tags)})")
         escalation_model = config.CLASSIFY_ESCALATION_MODEL
         logging.info(
             "[escalate] %s → triggering %s re-classify: %s",

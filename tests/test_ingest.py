@@ -795,6 +795,90 @@ def test_miscellaneous_label_triggers_escalation_regardless_of_confidence():
     assert second_kwargs.get("model_override") == "sonnet"
 
 
+def test_missed_actionable_triggers_escalation():
+    """Business label + high-precision trade tag without `actionable` must escalate."""
+    from unittest.mock import MagicMock, patch
+    from utils import classify_with_escalation
+
+    missed = {
+        "tags": ["trade_alert", "equity"], "labels": ["Business"],
+        "classification_confidence": 5, "classification_rationale": "No directed action.",
+    }
+    caught = {
+        "tags": ["actionable", "trade_alert", "equity"], "labels": ["Business"],
+        "classification_confidence": 5, "classification_rationale": "Actionable: applied.",
+    }
+
+    llm = MagicMock()
+    llm.call_json.side_effect = [missed, caught]
+    llm.consume_usage.return_value = (None, None)
+
+    with patch("utils.config") as mock_cfg:
+        mock_cfg.CLASSIFY_ESCALATION_THRESHOLD = 2  # confidence 5 would NOT trigger alone
+        mock_cfg.CLASSIFY_ESCALATION_MODEL = "sonnet"
+        mock_cfg.CLASSIFY_ACTIONABLE_REVIEW_TAGS = frozenset({
+            "trade_alert", "options", "insider_activity", "merger_arb", "arbitrage",
+            "special_situations", "rights_offering", "spinoff",
+        })
+        result, confidence, escalated, classify_model, classify_tokens = classify_with_escalation(llm, "sys", "user", "ctx")
+
+    assert escalated is True
+    assert "actionable" in result["tags"]
+    assert llm.call_json.call_count == 2
+    second_kwargs = llm.call_json.call_args_list[1][1]
+    assert second_kwargs.get("model_override") == "sonnet"
+
+
+def test_actionable_present_does_not_trigger_missed_actionable_escalation():
+    """`actionable` already applied must not double-trigger the missed-actionable check."""
+    from unittest.mock import MagicMock, patch
+    from utils import classify_with_escalation
+
+    llm = MagicMock()
+    llm.call_json.return_value = {
+        "tags": ["actionable", "trade_alert", "equity"], "labels": ["Business"],
+        "classification_confidence": 5, "classification_rationale": "Actionable: applied.",
+    }
+    llm.consume_usage.return_value = (None, None)
+
+    with patch("utils.config") as mock_cfg:
+        mock_cfg.CLASSIFY_ESCALATION_THRESHOLD = 2
+        mock_cfg.CLASSIFY_ESCALATION_MODEL = "sonnet"
+        mock_cfg.CLASSIFY_ACTIONABLE_REVIEW_TAGS = frozenset({
+            "trade_alert", "options", "insider_activity", "merger_arb", "arbitrage",
+            "special_situations", "rights_offering", "spinoff",
+        })
+        result, confidence, escalated, classify_model, classify_tokens = classify_with_escalation(llm, "sys", "user", "ctx")
+
+    assert escalated is False
+    llm.call_json.assert_called_once()
+
+
+def test_non_business_label_does_not_trigger_missed_actionable_escalation():
+    """Trade-signal tags on a non-Business label must not trigger the missed-actionable check."""
+    from unittest.mock import MagicMock, patch
+    from utils import classify_with_escalation
+
+    llm = MagicMock()
+    llm.call_json.return_value = {
+        "tags": ["trade_alert"], "labels": ["Technology"],
+        "classification_confidence": 5, "classification_rationale": "Clear.",
+    }
+    llm.consume_usage.return_value = (None, None)
+
+    with patch("utils.config") as mock_cfg:
+        mock_cfg.CLASSIFY_ESCALATION_THRESHOLD = 2
+        mock_cfg.CLASSIFY_ESCALATION_MODEL = "sonnet"
+        mock_cfg.CLASSIFY_ACTIONABLE_REVIEW_TAGS = frozenset({
+            "trade_alert", "options", "insider_activity", "merger_arb", "arbitrage",
+            "special_situations", "rights_offering", "spinoff",
+        })
+        result, confidence, escalated, classify_model, classify_tokens = classify_with_escalation(llm, "sys", "user", "ctx")
+
+    assert escalated is False
+    llm.call_json.assert_called_once()
+
+
 def test_confidence_and_rationale_stored_on_ingest(mock_gmail, mock_llm):
     """Summarize + classify confidence/rationale and escalation metadata must reach insert_content_record."""
     from unittest.mock import patch

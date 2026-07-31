@@ -10,7 +10,7 @@ and writes a DigestRuns record.
 Profile schema (YAML, self-contained — prompt inlined as the last key):
     kind: digest                  # discriminator (validated; optional)
     name: investment_digest
-    model: sonnet                 # optional; overrides LLM_ROUTING["synthesis"|"digest"]
+    model: sonnet                 # optional; overrides LLM_ROUTING["synthesis"|"digest"]; haiku|sonnet|opus
     recipient: summary@kupfer.me  # optional; falls back to DEFAULT_RECIPIENT
     output: [email]               # optional; default [email]
     inputs:

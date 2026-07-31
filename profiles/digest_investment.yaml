@@ -1,6 +1,6 @@
 kind: digest
 name: digest_investment
-model: sonnet
+model: opus
 recipient: digests@kupfer.me
 subject_template: 'Investment Digest - {period_end_date}'
 dedup_schedule: weekly_saturday
@@ -87,14 +87,28 @@ prompt: |
 
   1. **Report only current records** (`legacy = 0`). Do not report legacy records as news items.
   2. **Use legacy records and prior digests for context only** — to detect redundancy, note sentiment shifts, or identify corroboration. If a current record is substantively covered in a prior digest and nothing material has changed, suppress it. If it is covered but new context materially changes the picture, report it with the headline prefixed "Update:" and the item body beginning **Update Summary:** — ≤ 50 words (one sentence or short bullets) of only what materially changed.
-  3. **Consolidate** related current records into one item; list sources separately.
-  4. **Reward corroboration** — multi-source items rank above single-source.
-  5. **Split only along in-scope dimensions.** Break a record spanning multiple unrelated asset types/sectors into separate items only where each resulting item is in scope. Out-of-scope facets are dropped, not promoted into their own item.
-  6. **Scope is enforced per-facet, not per-record.** A record enters by label, but you report only its in-scope facets. If an in-scope record also carries an out-of-scope angle (market or investment implications, business deals, clinical advice, etc.), report the in-scope facet and omit the rest. Do not reproduce an out-of-scope angle because the source led with it.
-  7. **Cap at 25.** Report the 25 most significant items; drop the remainder.
-  8. **Corporate-news facets belong to the Business digest.** Omit corporate-news, M&A, and leadership angles even when attached to a valid trade idea; report only the asset/trade facet here.
-  9. **Evidence discipline.** A single data point cannot confirm two theses that imply opposite positioning. If one observation is cited toward more than one thesis (e.g. both a bullish “buildout” and a bearish “bubble” thesis), state which it most supports and treat the other as unresolved rather than claiming simultaneous validation.
-  10. If no current records qualify: `<p><em>Nothing to report.</em></p>`
+  3. **Consolidate by thesis, not by story.** Records belong in one item when they advance the *same underlying claim about the same driver*, even when they come from different authors, on different dates, with different framing or different supporting evidence. Do not require that they describe the same event, cite the same data, or reach the same conclusion — competing views on one thesis belong in the same item, presented as disagreement. The test is: **would a reader consider these one topic?** If yes, merge; list sources separately.
+     - Merge (same thesis): a structural-inflation regime-change argument from one author and another author's framing of the same regime question — even if one emphasizes Treasury yields and Fed balance sheet while the other emphasizes oil, tariffs, and shelter. One item: the inflation-regime thesis, with each source's contribution and any disagreement.
+     - Do not merge (different theses): a Fed rate-path call and a semiconductor demand note, even if both mention inflation in passing.
+  4. **One record, one item.** Each source record contributes to exactly one item. If a record's substance would appear in two items, that is duplication by definition — merge them, or keep the stronger and drop the weaker. Building an inventory of which records feed which item, and confirming no record appears twice, is part of producing the digest.
+  5. **One observation, one item.** A given data point — a yield level, an economic print, a policy action, a price move — is *headlined* in exactly one item. It may recur inside another item as supporting mechanism only if that item's thesis is genuinely independent. If two items lead with the same observation, they are one item.
+  6. **Merge pass before output — mandatory.** After drafting items and before emitting, re-read the full draft set and merge any pair that fails *any* of these tests:
+     - **Pointer test.** One item cites, defers to, or corroborates another ("see item N," "as in item N," "corroborated by item N," "consistent with the framework above").
+     - **Restatement test.** One item restates the other's substance in different words *without* pointing at it — e.g. a macro item arguing a structural inflation regime shift and a rates item reporting the yield moves that constitute that shift, attributing them to the same author's framework. This is the harder case and the one to look for: no cross-reference appears, yet both items rest on the same records and the same observations.
+     - **Source test.** The two items share a contributing record (rule 4) or lead with the same observation (rule 5).
+     A cross-reference is never the fix; merging is. The only permitted reference to prior coverage is to a *prior digest*, via the "Update:" mechanism in rule 2.
+  7. **Reward corroboration** — multi-source items rank above single-source. Corroboration is expressed *inside* one item by listing multiple sources, never by emitting a second item that agrees with the first.
+  8. **Split only along in-scope dimensions, and only when the parts are separate theses.** Break a record spanning multiple unrelated asset types/sectors into separate items only where each resulting item is in scope *and* advances a distinct thesis. Sub-arguments supporting one thesis (e.g. oil, tariffs, and shelter as three channels of one inflation-regime argument) stay in a single item as its component drivers — they are not three items. Out-of-scope facets are dropped, not promoted into their own item.
+  9. **Taxonomy classifies items; it never fragments them.** Type and Sector are labels applied *after* consolidation. A consolidated item spanning several sectors or types is classified by its dominant one and reported once; never split a single thesis into per-type or per-sector items to satisfy the taxonomy.
+  10. **A thesis and its market expression are one item — never two.** This is the most common duplication in this digest. When a macro thesis is *evidenced by* moves in a specific instrument, the thesis item and the instrument item are the same item. Report it once, under **Macro & Global Themes**, with the instrument levels carried inside it as the evidence. Do not additionally file the same levels under Fixed-Income, Commodity, Crypto, or Equity.
+      - Wrong: a Macro item on a structural inflation regime shift, *plus* a Fixed-Income item reporting the 30-year above 5%, the 10-year at 4.70%, and the 2-year at 4.35% attributed to the same authors. Two items, one topic — the second is the first's evidence restated.
+      - Right: one Macro item stating the regime thesis and carrying those yield levels as the evidence establishing it.
+      - An instrument item is warranted only when it stands on a thesis *no macro item in this digest already advances* — e.g. a credit-spread dislocation with an issuer-specific cause, unrelated to any reported macro theme.
+  11. **Scope is enforced per-facet, not per-record.** A record enters by label, but you report only its in-scope facets. If an in-scope record also carries an out-of-scope angle (market or investment implications, business deals, clinical advice, etc.), report the in-scope facet and omit the rest. Do not reproduce an out-of-scope angle because the source led with it.
+  12. **Cap at 25.** Report the 25 most significant items; drop the remainder. The cap is a ceiling, not a target — a well-consolidated digest of 8 items is better than a fragmented one of 25.
+  13. **Corporate-news facets belong to the Business digest.** Omit corporate-news, M&A, and leadership angles even when attached to a valid trade idea; report only the asset/trade facet here.
+  14. **Evidence discipline.** A single data point cannot confirm two theses that imply opposite positioning. If one observation is cited toward more than one thesis (e.g. both a bullish “buildout” and a bearish “bubble” thesis), state which it most supports and treat the other as unresolved rather than claiming simultaneous validation.
+  15. If no current records qualify: `<p><em>Nothing to report.</em></p>`
 
   ---
 
@@ -107,6 +121,8 @@ prompt: |
   2. Then by **Type** (Fixed-Income → Commodity → Crypto → Equity → Private)
   3. Within Equity, group by **Sector** under `<h3>` subheadings
 
+  This is an ordering scheme for items you have already consolidated — **not a coverage checklist**. Sections are populated only by items that survived the merge pass; empty sections are omitted silently. Never author an item to fill a section, and never place a macro item's supporting instrument moves into that instrument's section as a second item (rule 10). Each item appears exactly once, under one section.
+
   Each item (Format A with source inline):
   ```html
   <div class="item" id="invt-{n}">
@@ -116,16 +132,41 @@ prompt: |
 
   Then Further Information once, after all sections:
   ```html
-  <hr style="border: none; border-top: 4px solid #333; margin: 32px 0;">
+  <hr style="border: none; border-top: 8px double #333; margin: 32px 0;">
   <h2>Further Information</h2>
   <div id="fi-invt-{n}">
     <h3>{Specific headline — one declarative sentence}</h3>
-    <p>{≤ 600 words. What the sources collectively establish within this digest's scope; do not expand into adjacent domains the source touches. Note replication status and any disagreement. Prose only.}</p>
+    <p>{Opening paragraph: what the sources collectively establish within this digest's scope, and the through-line. Do not expand into adjacent domains the source touches. Note any disagreement.}</p>
+    <p><strong>{Subject — e.g. Company Name (TICKER), or the driver/channel}:</strong> {its specifics — figures, levels, thesis, valuation. If the subject has several genuinely separable dimensions (e.g. a stock thesis with performance, catalyst, and valuation), replace this sentence with the bulleted form below instead of running them together.}</p>
+    <p><strong>{Next subject}:</strong></p>
+    <ul>
+      <li><strong>{Dimension — e.g. Performance, Catalyst, Valuation, Risk}:</strong> {its detail.}</li>
+      <li><strong>{Next dimension}:</strong> {its detail.}</li>
+    </ul>
     <p>Sources: <a href="{url_1}" target="_blank">{source 1}</a> – {MM/DD/YYYY}</p>
     <p><em>Tags:</em> {comma-separated list of this item's tags}</p>
     <p><a href="#invt-{n}">↑ Back</a><br></p>
   </div>
   ```
+
+  **Paragraph separation — required.** The body is ≤ 1000 words total across all paragraphs. **Never cover multiple subjects inside one `<p>`.** Give every distinct subject its own `<p>`, opened with that subject in `<strong>` followed by a colon:
+  - a named holding, security, or issuer → one `<p>` each, led by `<strong>Company Name (TICKER):</strong>`
+  - a distinct driver, channel, or sub-thesis of a consolidated item (rates, oil, tariffs, shelter) → one `<p>` each, led by its name in `<strong>`
+  - a single-subject item needs no split — one or two plain paragraphs are correct, and the `<strong>` lead-in is unnecessary
+
+  Prose *within* each paragraph by default — full sentences, not a keyword list. The requirement is paragraph breaks *between* subjects, not list formatting. A run-on paragraph covering three tickers is a defect; three paragraphs, one per ticker, is correct.
+
+  **Bulleted sub-structure — for a subject with several separable dimensions.** Some subjects (typically a specific holding or trade idea) carry multiple distinct, independently meaningful facts — performance, catalyst/thesis, valuation, risk, financials. When a subject has three or more such dimensions, drop the `<strong>Subject:</strong>` sentence form and instead give the subject a bare `<p><strong>Subject:</strong></p>` header followed by a `<ul>`, one `<li>` per dimension, each led by a short bold label and a colon:
+  ```html
+  <p><strong>Company Name (TICKER):</strong></p>
+  <ul>
+    <li><strong>Performance:</strong> Q2 +X%, driven by ...</li>
+    <li><strong>Catalyst:</strong> management's plan / the thesis driving the position.</li>
+    <li><strong>Valuation:</strong> the multiple, and what it does or doesn't price in.</li>
+    <li><strong>Risk / downside:</strong> what could go wrong, or what's already priced.</li>
+  </ul>
+  ```
+  Use judgment on which dimensions apply and how many — two or three tight bullets beats forcing a rigid four-part template onto a thin item. A subject with only one or two facts stays as ordinary prose in a single `<p>`; do not bullet-ify a simple subject just to look structured. This is the one exception to "no `<ul>`/`<li>`" — it applies *within* a subject's own block, never as a substitute for the required paragraph break *between* subjects (rule above), and never for narrative/non-enumerable content (a macro thesis, a scientific finding, a regulatory story) where prose synthesis is still required.
 
   ---
 
@@ -136,3 +177,68 @@ prompt: |
   - `<strong>` for headlines, tickers, and key figures; `<em>` for attributions.
   - Prefer specific numbers, names, and dates over vague characterization.
   - End each Further Information entry with a **Tags** line: `<em>Tags:</em>` followed by the item's tags (union of contributing records' `tags`, deduplicated, lowercase, comma-separated).
+
+  ---
+
+  ## WORKED EXAMPLE — CONSOLIDATION
+
+  Three records arrive in one window, all bearing on whether the disinflationary era has ended:
+  - Author A (Jul 22): 30-year Treasury above 5% for the longest stretch since 2007; argues the Fed's $290B T-bill purchases since December are the primary accelerant.
+  - Author B (Jul 24): asks whether disinflation is over, separating oil/Hormuz, tariffs/goods, and shelter as three distinct channels; argues conflating them produces strategic error.
+  - Author C (Jul 25): argues AI is net deflationary long-run via productivity, but inflationary near-term via capital and energy intensity.
+
+  **Wrong (fragmented — cross-reference):** three items — one on Treasury yields and Fed balance sheet, one on Author B's three-channel framing, one on AI's inflation sign — with the second closing "corroborated by the framework in item 1." Three items, one topic, and a cross-reference proving it.
+
+  **Wrong (fragmented — restatement across sections):** one Macro item stating the regime thesis, *plus* a Fixed-Income item reading "30-year at longest run above 5% since 2007; 10-year broke May high at 4.70%; 2-year at 4.35% (+5 bps Jul 23); Author A documents structural regime behind the move." No cross-reference appears, so the pointer test passes — but it fails the restatement, record, and observation tests: the Fixed-Income item is built from the same records and headlines the same yield levels that are the Macro item's evidence. A thesis and the instrument moves that evidence it are one item (rule 10). The section scheme does not entitle rates data to its own Fixed-Income entry.
+
+  **Right (consolidated):** one item under **Macro / Multi-Sector**, thesis: *is the disinflationary regime over?* The brief writeup states the thesis and the state of the argument. The Further Information entry lays out each channel — rates/Fed balance sheet (carrying the 30-year, 10-year, and 2-year levels as evidence), oil, tariffs, shelter, AI capex-vs-productivity — as component drivers of the single question, names which author advances which, and flags where they disagree (notably AI's near-term sign). All three sources listed on the Sources line; tags are the union across the three records. **The Fixed-Income section is not populated by this material at all.**
+
+  ```html
+  <div class="item" id="invt-1">
+    <p><strong>Disinflationary regime under sustained challenge across rates, energy, tariffs, and AI capex.</strong> 30-year Treasury above <strong>5%</strong> for the longest run since <strong>2007</strong>; three authors converge on regime change while splitting on AI's near-term inflation sign. <a href="#fi-invt-1">→ Further detail</a></p>
+  </div>
+  ```
+
+  Its Further Information entry — note one paragraph per driver, never a run-on block:
+  ```html
+  <div id="fi-invt-1">
+    <h3>Three independent frameworks converge on the end of the disinflationary regime, splitting only on AI</h3>
+    <p>Authors A, B, and C arrive at regime change from different directions — balance-sheet mechanics, channel decomposition, and productivity analysis respectively. They agree the disinflationary era has ended and disagree on AI's near-term sign, which is the live question rather than a settled input.</p>
+    <p><strong>Rates and Fed balance sheet:</strong> The 30-year has held above <strong>5%</strong> for the longest stretch since <strong>2007</strong>, with the 10-year through its May high at <strong>4.70%</strong> and the 2-year at <strong>4.35%</strong>. Author A attributes the move to <strong>$290B</strong> of T-bill purchases since December as the primary accelerant.</p>
+    <p><strong>Energy:</strong> Author B isolates oil and Hormuz risk as a discrete channel, warning that conflating it with the goods and shelter channels produces strategic error.</p>
+    <p><strong>Tariffs and goods:</strong> Treated as a separate and more persistent channel than energy, with pass-through still incomplete.</p>
+    <p><strong>Shelter:</strong> The slowest-moving channel; Author B holds it is the one most likely to keep core elevated after energy normalizes.</p>
+    <p><strong>AI capex versus productivity:</strong> Author C argues AI is net deflationary long-run through productivity but inflationary near-term through capital and energy intensity. This is the sole point of disagreement across the three; treat the near-term sign as unresolved.</p>
+    <p>Sources: <a href="https://example.com/a" target="_blank">Author A</a> – 07/22/2026; <a href="https://example.com/b" target="_blank">Author B</a> – 07/24/2026; <a href="https://example.com/c" target="_blank">Author C</a> – 07/25/2026</p>
+    <p><em>Tags:</em> inflation, rates, fed, macro, oil_gas, tariffs, housing, ai_capex</p>
+    <p><a href="#invt-1">↑ Back</a><br></p>
+  </div>
+  ```
+
+  ---
+
+  ## WORKED EXAMPLE — DENSE STOCK THESIS (BULLETED SUB-STRUCTURE)
+
+  A Sector fund letter covers three holdings in one window, each with several distinct facts (performance, catalyst, valuation).
+
+  **Wrong (run-on paragraph):** "Bloomin' Brands (BLMN): Q2 +66.7% after the fund positioned in the transformation; management investing in Outback food quality improvements, restaurant remodels, and marketing; consumer scores and restaurant traffic improving; EBITDA margins at a near-historical low of 7–8% vs. industry low-to-mid teens; current valuation embeds zero transformation success at 0.2× price-to-sales, forward EV/EBITDA below 5×, and normalized earnings yield above 30%. If successful, normalized EBITDA exceeds $500M with annual FCF yield above 40%." One paragraph, five distinct facts (performance, catalyst, current margin, valuation, upside case) run together — the reader can't scan it.
+
+  **Right (bulleted):**
+  ```html
+  <p><strong>Bloomin' Brands (BLMN):</strong></p>
+  <ul>
+    <li><strong>Performance:</strong> Q2 <strong>+66.7%</strong> after the fund positioned ahead of the transformation.</li>
+    <li><strong>Catalyst:</strong> management investing in Outback food quality, restaurant remodels, and marketing; consumer scores and restaurant traffic both improving.</li>
+    <li><strong>Current margin:</strong> EBITDA margins at a near-historical low of <strong>7–8%</strong> vs. an industry range of low-to-mid teens.</li>
+    <li><strong>Valuation:</strong> current price embeds zero transformation success — <strong>0.2×</strong> price-to-sales, forward EV/EBITDA below <strong>5×</strong>, normalized earnings yield above <strong>30%</strong>.</li>
+    <li><strong>Upside case:</strong> if successful, normalized EBITDA exceeds <strong>$500M</strong> with annual FCF yield above <strong>40%</strong>.</li>
+  </ul>
+  <p><strong>Crescent Energy (CRGY):</strong></p>
+  <ul>
+    <li><strong>Performance:</strong> Q2 <strong>-21.9%</strong> as oil prices pulled back; position recently increased.</li>
+    <li><strong>Catalyst:</strong> Vital Energy acquisition adds Permian production footprint; new senior executive previously at Pioneer leading Permian expansion.</li>
+    <li><strong>Hidden asset:</strong> mineral and royalty business generates <strong>$200M</strong> annual EBITDA; comparable transactions at 7–11× multiples imply <strong>$1.4–2B+</strong> underlying value on that segment alone.</li>
+    <li><strong>Valuation:</strong> even at current oil prices, <strong>$1B+</strong> annual FCF potential, <strong>30%</strong> forward FCF yield, <strong>5%</strong> dividend yield, shares below <strong>2×</strong> cash flow.</li>
+  </ul>
+  ```
+  Gray Media (GTN), by contrast, has only one fact in this window ("Q2 –7.6% due to weak core advertising") — that stays a single plain sentence in its own `<p>`, no bullets, per the two-or-fewer-facts rule above.

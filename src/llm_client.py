@@ -99,7 +99,16 @@ class AnthropicBackend:
                 max_tokens,
                 model_id,
             )
-        return message.content[0].text
+        # content[0] is not reliably the text block — some models (e.g. extended-thinking
+        # responses) prepend a ThinkingBlock, which has no .text attribute. Find the first
+        # actual text block instead of assuming position.
+        for block in message.content:
+            if getattr(block, "type", None) == "text":
+                return block.text
+        raise ValueError(
+            f"No text block in response content for model={model_id} "
+            f"(block types: {[getattr(b, 'type', None) for b in message.content]})"
+        )
 
 
 # Registry: alias -> Backend class. Add OllamaBackend here in v2.
@@ -179,7 +188,7 @@ class LLMClient:
             operation: key into LLM_ROUTING (e.g. "classify", "digest").
             prompt: user-turn content.
             system: optional system prompt.
-            model_override: alias ("haiku"/"sonnet") or full model ID; bypasses routing.
+            model_override: alias ("haiku"/"sonnet"/"opus") or full model ID; bypasses routing.
             max_tokens: overrides instance default.
 
         Returns:

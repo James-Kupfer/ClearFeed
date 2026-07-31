@@ -43,12 +43,22 @@ prompt: |
 
   ## GLOBAL SYNTHESIS RULES
 
-  1. **Consolidate.** Same or closely related findings from multiple sources become one item; list sources separately.
-  2. **Reward corroboration.** Findings replicated or confirmed by independent sources rank above single-source claims.
-  3. **Short-writeup -> detail.** Each item is a concise writeup linking to an expanded Further Information entry.
-  4. **No repeats.** Do not re-report a finding covered in a prior digest unless there is a significant update. When you do, prefix the headline with "Update:" and begin the item body with **Update Summary:** -- <= 50 words (one sentence or short bullets) of only what materially changed.
-  5. **Split only along in-scope dimensions.** Break a multi-topic record into separate items only where the resulting items are all in scope for this digest. Out-of-scope facets are dropped, not promoted into their own item. Never create an item whose subject falls outside this digest's scope, even if the source pairs it with in-scope material.
-  6. **Scope is enforced per-facet, not per-record.** A record enters by label, but you report only its in-scope facets. If an in-scope record also carries an out-of-scope angle (market or investment implications, business deals, clinical advice, etc.), report the in-scope facet and omit the rest. Do not reproduce an out-of-scope angle because the source led with it.
+  1. **Consolidate by question, not by paper.** Records belong in one item when they bear on the *same scientific question or the same underlying claim*, even when they come from different groups, on different dates, using different methods or reaching different conclusions. Do not require that they report the same study, cite the same data, or agree — replication, contradiction, and competing explanations of one claim all belong in the same item, presented as the state of the evidence. The test is: **would a reader consider these one topic?** If yes, merge; list sources separately.
+     - Merge (same question): two independent groups reporting on the same phenomenon plus a critique of the underlying method — one item on what the evidence now establishes and where it is contested, not three.
+     - Do not merge (distinct questions): an exoplanet detection and a materials-science result, even if both are framed as breakthroughs.
+  2. **One record, one item.** Each source record contributes to exactly one item. If a record's substance would appear in two items, that is duplication by definition — merge them, or keep the stronger and drop the weaker. Building an inventory of which records feed which item, and confirming no record appears twice, is part of producing the digest.
+  3. **One observation, one item.** A given result — an effect size, a sample, a measurement, a detection — is *headlined* in exactly one item. It may recur inside another item as supporting evidence only if that item's question is genuinely independent. If two items lead with the same observation, they are one item.
+  4. **Merge pass before output — mandatory.** After drafting items and before emitting, re-read the full draft set and merge any pair that fails *any* of these tests:
+     - **Pointer test.** One item cites, defers to, or corroborates another ("see item N," "as in item N," "corroborated by item N," "consistent with the finding above").
+     - **Restatement test.** One item restates the other's substance in different words *without* pointing at it — e.g. an item on what the evidence now establishes and a separate item reporting the individual study results that establish it, drawn from the same coverage. This is the harder case and the one to look for: no cross-reference appears, yet both items rest on the same records and the same observations.
+     - **Source test.** The two items share a contributing record (rule 2) or lead with the same observation (rule 3).
+     A cross-reference is never the fix; merging is. The only permitted reference to prior coverage is to a *prior digest*, via the "Update:" mechanism in rule 7.
+  5. **Reward corroboration.** Findings replicated or confirmed by independent sources rank above single-source claims. Corroboration is expressed *inside* one item by listing multiple sources, never by emitting a second item that agrees with the first.
+  6. **Short-writeup -> detail.** Each item is a concise writeup linking to an expanded Further Information entry.
+  7. **No repeats.** Do not re-report a finding covered in a prior digest unless there is a significant update. When you do, prefix the headline with "Update:" and begin the item body with **Update Summary:** -- <= 50 words (one sentence or short bullets) of only what materially changed.
+  8. **Split only along in-scope dimensions, and only when the parts are separate questions.** Break a multi-topic record into separate items only where the resulting items are all in scope for this digest *and* each addresses a distinct question. Sub-findings supporting one claim stay in a single item as its supporting evidence. Out-of-scope facets are dropped, not promoted into their own item. Never create an item whose subject falls outside this digest's scope, even if the source pairs it with in-scope material.
+  9. **A claim and its evidence are one item — never two.** When a finding is *established by* specific results (the conclusion and the study data behind it; the replication and the original), report it once with the evidence carried inside. A separate item is warranted only when the results bear on a question no other item in this digest already covers.
+  10. **Scope is enforced per-facet, not per-record.** A record enters by label, but you report only its in-scope facets. If an in-scope record also carries an out-of-scope angle (market or investment implications, business deals, clinical advice, etc.), report the in-scope facet and omit the rest. Do not reproduce an out-of-scope angle because the source led with it.
 
   ---
 
@@ -58,7 +68,7 @@ prompt: |
 
   **Scope:** important science news and major findings -- physics, space, climate, biology, chemistry, materials, mathematics, and non-clinical research. Do not consider or report on any investment- or business-oriented content. Commercial, funding, and market-reaction framing are out of scope even when the underlying finding is in scope. 
 
-  **Cap at 25.** Include only the **25 most significant** items. Rank by significance of the finding and cross-source corroboration; drop the remainder.
+  **Cap at 25.** Include only the **25 most significant** items. Rank by significance of the finding and cross-source corroboration; drop the remainder. The cap is a ceiling, not a target — a well-consolidated digest of 8 items is better than a fragmented one of 25.
 
   Each item (Format A):
   ```html
@@ -69,16 +79,25 @@ prompt: |
 
   Then Further Information once, after all items:
   ```html
-  <hr style="border: none; border-top: 4px solid #333; margin: 32px 0;">
+  <hr style="border: none; border-top: 8px double #333; margin: 32px 0;">
   <h2>Further Information</h2>
   <div id="fi-sci-{n}">
     <h3>{Specific headline}</h3>
-    <p>{<= 600 words. What the sources collectively establish within this digest's scope; do not expand into adjacent domains the source touches. Note replication status and any disagreement. Prose only.}</p>
+    <p>{Opening paragraph: what the sources collectively establish within this digest's scope, and the through-line. Do not expand into adjacent domains the source touches. Note replication status and any disagreement.}</p>
+    <p><strong>{Subject — e.g. the group/study, or the facet: methods, results, critique}:</strong> {its specifics — effect sizes, samples, conditions.}</p>
+    <p><strong>{Next subject}:</strong> {its specifics.}</p>
     <p>Sources: <a href="{url_1}" target="_blank">{source 1}</a> – {MM/DD/YYYY}; <a href="{url_2}" target="_blank">{source 2}</a> – {MM/DD/YYYY}</p>
     <p><em>Tags:</em> {comma-separated list of this item's tags}</p>
     <p><a href="#sci-{n}">^ Back</a><br></p>
   </div>
   ```
+
+  **Paragraph separation — required.** The body is <= 1000 words total across all paragraphs. **Never cover multiple subjects inside one `<p>`.** Give every distinct subject its own `<p>`, opened with that subject in `<strong>` followed by a colon:
+  - a named study, group, or organism/system under study -> one `<p>` each, led by its name in `<strong>`
+  - a distinct facet of a consolidated item (the finding, the replication attempt, the methodological critique) -> one `<p>` each, led by its name in `<strong>`
+  - a single-subject item needs no split -- one or two plain paragraphs are correct, and the `<strong>` lead-in is unnecessary
+
+  Prose *within* each paragraph -- full sentences, no bullet lists, no `<ul>`/`<li>`. The requirement is paragraph breaks *between* subjects, not list formatting. A run-on paragraph covering three studies is a defect; three paragraphs, one per study, is correct.
 
   If nothing qualifies: `<p><em>Nothing to report.</em></p>`
 
@@ -101,7 +120,7 @@ prompt: |
     <p><strong>Room-temperature quantum coherence reported in engineered molecular system.</strong> Two independent groups report coherence times above <strong>100 ns</strong> at <strong>298K</strong>, corroborating an earlier preprint. <a href="#fi-sci-1">-> Further detail</a></p>
   </div>
 
-  <hr style="border: none; border-top: 4px solid #333; margin: 32px 0;">
+  <hr style="border: none; border-top: 8px double #333; margin: 32px 0;">
   <h2>Further Information</h2>
   <div id="fi-sci-1">
     <h3>Independent replication lifts confidence in room-temperature molecular quantum coherence</h3>

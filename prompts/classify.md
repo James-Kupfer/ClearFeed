@@ -102,7 +102,7 @@ Poor: "It's a tech newsletter so it's Technology."
 </rationale>
 
 <worked_examples>
-Three end-to-end examples anchoring the boundary rules above. Each shows the reasoning and the exact JSON that should follow.
+Six end-to-end examples anchoring the boundary rules above. Each shows the reasoning and the exact JSON that should follow.
 
 Example 1 — Business vs. Politics, market/analytical framing wins.
 Reasoning: geopolitical and energy-market content framed around hydrocarbon flows and source-evaluation methodology, not civic/governmental news — Business per the Business vs Politics boundary rule, with a secondary method/epistemology tag cluster. No directed action for the reader — commentary and analysis only, actionable withheld.
@@ -171,6 +171,70 @@ Reasoning: a government-account confirmation link with a 24-hour deadline is the
     "Personal"
   ],
   "classification_confidence": 5
+}
+```
+
+Example 4 — Investment actionable, named ticker plus a specific catalyst and valuation entry.
+Reasoning: a value-focused newsletter names a specific ticker, cites a cash-yield figure and a dated catalyst (rights offering vote), and frames it as a trade the reader can independently underwrite from the disclosed numbers — meets the "named ticker plus a direction, price target, entry, or stop" trigger. Not promotional (no sponsor disclosure, no hype language, figures are sourced to filings) so the promotional-securities hard override does not apply.
+```json
+{
+  "tags": [
+    "actionable",
+    "special_situations",
+    "equity",
+    "activist",
+    "rights_offering",
+    "valuation",
+    "cash_flow",
+    "trade_alert"
+  ],
+  "classification_rationale": "Actionable: applied. The newsletter names a specific small-cap ticker trading at an 8% free-cash-flow yield ahead of a shareholder vote on a rights offering, with the author disclosing an existing long position and a stated view that the offering terms are cheap relative to the sponsor's own recent open-market buys. Named ticker plus a specific entry rationale and dated catalyst meets the financial-signal trigger; no promotional or hard-override signal (sourced to the company's own filings, no sponsor disclosure, no hype language, author discloses their own position). Tags: special_situations, equity, activist, rights_offering (the corporate-action mechanics), valuation, cash_flow (the entry rationale), trade_alert (format). No invented tags. Labels: Business from the dominant investment-thesis cluster; no purpose signals.",
+  "labels": [
+    "Business"
+  ],
+  "classification_confidence": 5
+}
+```
+
+Example 5 — Investment actionable, options structure with named ticker, strike, and expiry.
+Reasoning: a technical/derivatives newsletter proposes a specific options structure — named index, strike, and expiry — as a hedge against a dated catalyst (an FOMC decision). This is the clearest form of the "options/leaps/puts/calls with a named ticker" trigger; the structure is independently verifiable (any reader can quote the same strike) and carries no promotional framing.
+```json
+{
+  "tags": [
+    "actionable",
+    "options",
+    "macro",
+    "rates",
+    "technical_analysis",
+    "risk_management",
+    "trade_alert"
+  ],
+  "classification_rationale": "Actionable: applied. The author recommends buying out-of-the-money index puts at a named strike expiring the week of the upcoming FOMC meeting, sized as a portfolio hedge, with the current premium and breakeven level quoted. Named instrument plus strike and expiry meets the options trigger explicitly called out in the actionable rule; no hard override applies (not a stock tout, no sponsor, no unverifiable ticker). Tags: options, macro, rates (the FOMC/rates driver), technical_analysis (the strike/level selection method), risk_management (framed as a hedge, not speculation), trade_alert (format). No invented tags. Labels: Business from the derivatives/macro-positioning cluster; no purpose signals.",
+  "labels": [
+    "Business"
+  ],
+  "classification_confidence": 5
+}
+```
+
+Example 6 — Investment actionable, first-person trade disclosure embedded in a broader thesis piece.
+Reasoning: the bulk of the piece is analytical (a structural argument about customer concentration in a supply chain), but the author discloses their own new short position in a named, tradeable index as the payoff of that argument. The disclosure is a genuine action taken by the author, not just news about someone else's position (contrast: a Google Alert reporting what a well-known investor did elsewhere is not actionable — no directed signal, just third-party news) — so it clears the bar even though it is one sentence inside a longer commentary piece.
+```json
+{
+  "tags": [
+    "actionable",
+    "semiconductor",
+    "supply_chain",
+    "short_position",
+    "risk_management",
+    "trading",
+    "newsletter"
+  ],
+  "classification_rationale": "Actionable: applied. Most of the piece is structural commentary on customer concentration risk in a chip supply chain, but the author states they are short a named semiconductor index as a direct expression of that thesis. A named, tradeable instrument plus a stated direction from the author's own book meets the financial-signal trigger, even though it is embedded in a longer analytical piece rather than the sole subject — the trigger is the disclosed position, not the surrounding commentary. Distinguish from a third-party news digest merely reporting that some investor holds a similar view elsewhere, which stays commentary. Tags: semiconductor, supply_chain (the structural thesis), short_position, risk_management, trading (the disclosed action), newsletter (format). No invented tags. Labels: Business from the investment-thesis cluster; no purpose signals.",
+  "labels": [
+    "Business"
+  ],
+  "classification_confidence": 4
 }
 ```
 

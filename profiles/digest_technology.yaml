@@ -41,13 +41,24 @@ prompt: |
 
   ## GLOBAL SYNTHESIS RULES
 
-  1. **Consolidate.** The same or closely related story from multiple sources becomes one item; list contributing sources separately in its Further Information entry.
-  2. **Reward corroboration.** Items confirmed by multiple *independent* sources rank above single-source items or the same author repeated.
-  3. **Short-writeup → detail.** Each item is a concise writeup linking to an expanded Further Information entry.
-  4. **No repeats.** Do not re-report an item covered in a prior digest unless there is a significant update or change. When you do, prefix the headline with "Update:" and begin the item body with **Update Summary:** — ≤ 50 words (one sentence or short bullets) of only what materially changed.
-  5. **Split only along in-scope dimensions.** Break a multi-topic record into separate items only where the resulting items are all in scope for this digest. Out-of-scope facets are dropped, not promoted into their own item. Never create an item whose subject falls outside this digest's scope, even if the source pairs it with in-scope material.
-  6. **Scope is enforced per-facet, not per-record.** A record enters by label, but you report only its in-scope facets. If an in-scope record also carries an out-of-scope angle (market or investment implications, business deals, clinical advice, etc.), report the in-scope facet and omit the rest. Do not reproduce an out-of-scope angle because the source led with it.
-  6. **Cap at 25.** Report the 25 most significant items; drop the remainder.
+  1. **Consolidate by development, not by article.** Records belong in one item when they concern the *same technical development or the same underlying capability shift*, even when they come from different outlets, on different dates, with different framing or different detail. Do not require that they describe the same release, cite the same benchmarks, or reach the same conclusion — competing assessments of one development belong in the same item, presented as disagreement. The test is: **would a reader consider these one topic?** If yes, merge; list contributing sources separately in the Further Information entry.
+     - Merge (same development/shift): several labs shipping long-context updates in one window, plus a benchmark analysis of them and a piece on the pricing response — one item on the long-context frontier moving, not four. Likewise, a model release and a how-to guide for using that same model are one item.
+     - Do not merge (distinct developments): a frontier-model release and an unrelated developer-tooling launch, even if both are described as agentic.
+  2. **One record, one item.** Each source record contributes to exactly one item. If a record's substance would appear in two items, that is duplication by definition — merge them, or keep the stronger and drop the weaker. Building an inventory of which records feed which item, and confirming no record appears twice, is part of producing the digest.
+  3. **One observation, one item.** A given fact — a benchmark score, a context-window figure, a price point, a version number — is *headlined* in exactly one item. It may recur inside another item as supporting context only if that item's development is genuinely independent. If two items lead with the same observation, they are one item.
+  4. **Merge pass before output — mandatory.** After drafting items and before emitting, re-read the full draft set and merge any pair that fails *any* of these tests:
+     - **Pointer test.** One item cites, defers to, or corroborates another ("see item N," "as in item N," "corroborated by item N," "part of the shift described above").
+     - **Restatement test.** One item restates the other's substance in different words *without* pointing at it — e.g. an item on the long-context frontier moving and a separate item reporting the individual benchmark numbers that establish it, drawn from the same coverage. This is the harder case and the one to look for: no cross-reference appears, yet both items rest on the same records and the same observations.
+     - **Source test.** The two items share a contributing record (rule 2) or lead with the same observation (rule 3).
+     A cross-reference is never the fix; merging is. The only permitted reference to prior coverage is to a *prior digest*, via the "Update:" mechanism in rule 7.
+  5. **Reward corroboration.** Items confirmed by multiple *independent* sources rank above single-source items or the same author repeated. Corroboration is expressed *inside* one item by listing multiple sources, never by emitting a second item that agrees with the first.
+  6. **Short-writeup → detail.** Each item is a concise writeup linking to an expanded Further Information entry.
+  7. **No repeats.** Do not re-report an item covered in a prior digest unless there is a significant update or change. When you do, prefix the headline with "Update:" and begin the item body with **Update Summary:** — ≤ 50 words (one sentence or short bullets) of only what materially changed.
+  8. **Split only along in-scope dimensions, and only when the parts are separate developments.** Break a multi-topic record into separate items only where the resulting items are all in scope for this digest *and* each concerns a distinct development. Facets of one development (the release, its benchmark results, its tooling implications) stay in a single item. Out-of-scope facets are dropped, not promoted into their own item. Never create an item whose subject falls outside this digest's scope, even if the source pairs it with in-scope material.
+  9. **Categories classify items; they never fragment them.** The `<h2>` category headers are applied *after* consolidation. A consolidated item touching several categories is filed under its dominant one and reported once; never split one development into per-category items (e.g. a model release under Frontier Models plus its own Developer Tooling item) to populate the category set. Sections are populated only by items that survived the merge pass — empty sections are omitted silently, and no item is ever authored to fill one.
+  10. **A development and its evidence are one item — never two.** When a capability shift is *evidenced by* specific results (the frontier moving and the benchmark scores that show it; a release and its pricing response), report it once with the evidence carried inside. A separate item is warranted only when the results stand on a development no other item in this digest already covers.
+  11. **Scope is enforced per-facet, not per-record.** A record enters by label, but you report only its in-scope facets. If an in-scope record also carries an out-of-scope angle (market or investment implications, deal mechanics, clinical advice, etc.), report the in-scope facet and omit the rest. Do not reproduce an out-of-scope angle because the source led with it.
+  12. **Cap at 25.** Report the 25 most significant items; drop the remainder. The cap is a ceiling, not a target — a well-consolidated digest of 8 items is better than a fragmented one of 25.
 
   ---
 
@@ -68,17 +79,26 @@ prompt: |
 
   Then render Further Information once, after all categories:
   ```html
-  <hr style="border: none; border-top: 4px solid #333; margin: 32px 0;">
+  <hr style="border: none; border-top: 8px double #333; margin: 32px 0;">
   <h2>Further Information</h2>
   <div id="fi-aitech-{n}">
     <h3>{Specific headline — one declarative sentence}</h3>
-    <p>{Expanded synthesis ≤ 600 words. State what the sources collectively establish within this digest's scope; do not expand into adjacent domains the source touches. Note any disagreement. Prose only.}</p>
+    <p>{Opening paragraph: what the sources collectively establish within this digest's scope, and the through-line. Do not expand into adjacent domains the source touches. Note any disagreement.}</p>
+    <p><strong>{Subject — e.g. Model/Product Name, lab, or the facet: benchmarks, pricing, tooling}:</strong> {its specifics — figures, versions, dates.}</p>
+    <p><strong>{Next subject}:</strong> {its specifics.}</p>
     <p>Sources: <a href="{url_1}" target="_blank">{source 1}</a> – {MM/DD/YYYY}; <a href="{url_2}" target="_blank">{source 2}</a> – {MM/DD/YYYY}</p>
     <p><em>Tags:</em> {comma-separated list of this item's tags}</p>
     <p><a href="#aitech-{n}">↑ Back</a><br></p>
   </div>
   ```
   List one source for single-source items; each contributing source for consolidated items.
+
+  **Paragraph separation — required.** The body is ≤ 1000 words total across all paragraphs. **Never cover multiple subjects inside one `<p>`.** Give every distinct subject its own `<p>`, opened with that subject in `<strong>` followed by a colon:
+  - a named model, product, lab, or vendor → one `<p>` each, led by `<strong>Model/Product Name:</strong>`
+  - a distinct facet of a consolidated item (the release itself, benchmark results, pricing response, tooling implications) → one `<p>` each, led by its name in `<strong>`
+  - a single-subject item needs no split — one or two plain paragraphs are correct, and the `<strong>` lead-in is unnecessary
+
+  Prose *within* each paragraph — full sentences, no bullet lists, no `<ul>`/`<li>`. The requirement is paragraph breaks *between* subjects, not list formatting. A run-on paragraph covering three model releases is a defect; three paragraphs, one per release, is correct.
 
   If nothing qualifies: `<p><em>Nothing to report.</em></p>`
 
@@ -107,7 +127,7 @@ prompt: |
     <p><strong>Practical guide to local RAG with ChromaDB and Ollama.</strong> Step-by-step privacy-preserving document indexing on local hardware, covering chunking strategy and embedding-model trade-offs. <a href="#fi-aitech-2">→ Further detail</a></p>
   </div>
 
-  <hr style="border: none; border-top: 4px solid #333; margin: 32px 0;">
+  <hr style="border: none; border-top: 8px double #333; margin: 32px 0;">
   <h2>Further Information</h2>
   <div id="fi-aitech-1">
     <h3>Competing long-context releases compress the frontier-model field within a single week</h3>

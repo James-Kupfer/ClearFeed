@@ -45,7 +45,7 @@ todoist:
     ---
     **Sources:** {sources}
     **Sent:** {source_dates}
-    *task_investment v17*
+    *task_investment v18*
 
 # --- Prompt ---
 # Receives {records_json} (JSON array of current records) and {prior_actions_json}
@@ -110,7 +110,7 @@ prompt: |
 
   1. **One action per unique Type/Sector bucket.** The bucket is the consolidation key — two items with different types or different sectors are in different buckets and must be separate actions. Industry is metadata, not a split dimension; list all relevant industries for the consolidated action in the `industry` field (comma-separated if multiple). Thematic or stylistic similarity (e.g. both being "value" ideas) is not a basis for merging. Shared Type/Sector is necessary but not sufficient to co-list evidence under one action's thesis: items that fall in the same bucket but do not bear on the thesis are dropped, not appended as extra figures.
   2. **Macro is exclusive.** If an item qualifies as Macro / Multi-Sector, set type=`Macro`, sector=`Macro / Multi-Sector`, industry=`Multi-Asset` (or the most specific macro sub-category). Do not assign a specific Type/Sector/Industry alongside it. If an item has both a specific equity angle and a macro dimension, choose the classification that best describes the required action. **Macro items default to priority 4** unless there is a hard intraday or 48-hour catalyst (e.g. a central bank decision happening today or tomorrow).
-  3. **Suppress redundant actions** — if an action is substantively covered in the prior actions context and nothing material has changed, skip it. If the same action applies but new context materially changes the picture, include it with the title prefixed "Update: ".
+  3. **Suppress redundant actions** — if an action is substantively covered in the prior actions context and nothing material has changed, skip it. If the same action applies but new context materially changes the picture, include it as an update per the title format below.
   4. **Include `record_ids`** — list all record ids that contributed to each action.
   5. If no records warrant an action, return `{"actions": []}`.
   6. **Evidence discipline.** A single data point cannot confirm two theses that imply opposite positioning. If one observation is cited toward more than one thesis (e.g. both a bullish "buildout" thesis and a bearish "bubble" thesis), state which it most supports and treat the other as unresolved rather than claiming simultaneous validation.
@@ -139,7 +139,7 @@ prompt: |
         "type": "<Type>",
         "sector": "<Sector>",
         "industry": "<Industry or industries covered, comma-separated if multiple>",
-        "action": "<topic title, ≤ 5 words. No action verbs (not 'Assess', 'Research', 'Evaluate', 'Initiate', etc.) — name the subject, not the task. Prefix with 'Update: ' if this updates a prior action with new context.>",
+        "action": "<topic title, ≤ 5 words. No action verbs (not 'Assess', 'Research', 'Evaluate', 'Initiate', etc.) — name the subject, not the task. If this updates a prior action with new context, prefix with 'Update: ' AND append ' — <3-6 word clause naming what's new>' so consecutive updates on the same topic are distinguishable at a glance in a task list (e.g. 'Update: FOMC Vol & SPX Bounds — hike-odds mispricing', not a bare repeat of the original title).>",
         "description": "<structured Markdown. Sections in order: (1) one sentence stating the action required and naming a single falsifiable thesis it rests on; (2) **Key Figures** — bulleted list of specific numbers, tickers, dates, prices. Every figure must name its underlying stock/asset — never cite a strike, expiry, or price without the ticker (e.g. '**NVDA** June 18 $135 calls at $1', not 'June 18 $135 calls at $1'). **Relevance gate:** each figure must be causally linked to this action's central thesis — it must change the investment case, not merely appear in the source. Exclude topically adjacent numbers (product benchmarks, unrelated funding rounds, general survey stats) that don't move the thesis. If an action rests on a single material data point, keep Key Figures tightly scoped to that point; do not pad with adjacent items to inflate substance — a thin action should be brief, not bulked; (3) relevant context in 1–3 sentences of prose; (4) **Key Risks** — bulleted list addressing what would falsify this action's central thesis, including whether the cited evidence is strong enough to support it. Do not merely restate a caveat for each figure; risks are scoped to the thesis, not to individual data points. Bold key figures throughout.>",
         "priority": <1 | 2 | 3 | 4 — see Priority Scale below>,
         "due_string": "<Todoist natural-language due date per Priority Scale>",

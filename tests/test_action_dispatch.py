@@ -436,6 +436,46 @@ def test_run_aggregate_creates_one_task_per_action(tmp_path):
         assert "action" in parsed
 
 
+def test_run_aggregate_uses_action_max_tokens(tmp_path):
+    """Regression (2026-07-27): the aggregate LLM call must use config.ACTION_MAX_TOKENS,
+    not the smaller classify/summarize LLM_MAX_TOKENS. Sonnet 5's thinking output could
+    exhaust the smaller budget before emitting any JSON, silently zeroing out every
+    task_investment run (created=0, no error surfaced above debug-level logs)."""
+    from action_dispatch import _run_aggregate
+    import config
+
+    records = [{"id": 1, "sender": "x@y.com", "subject": "Test", "executive_summary": "X."}]
+    profile = yaml.safe_load(_minimal_aggregate_profile())
+    profile["name"] = "task_investment"
+
+    mock_llm = MagicMock()
+    mock_llm.call_json.return_value = {"actions": []}
+
+    with patch("action_dispatch.query_prior_actions", return_value=[]):
+        _run_aggregate(profile, records, mock_llm, {})
+
+    call_kwargs = mock_llm.call_json.call_args[1]
+    assert call_kwargs.get("max_tokens") == config.ACTION_MAX_TOKENS
+    assert config.ACTION_MAX_TOKENS > config.LLM_MAX_TOKENS
+
+
+def test_action_one_uses_action_max_tokens():
+    """Regression (2026-07-27): per-record action calls must also use ACTION_MAX_TOKENS."""
+    from action_dispatch import _action_one
+    import config
+
+    profile = yaml.safe_load(_minimal_profile())
+    record = {"id": 1, "sender": "x@y.com", "subject": "Test"}
+
+    mock_llm = MagicMock()
+    mock_llm.call_json.return_value = {"name": "Test", "description": "Test."}
+
+    _action_one(record, profile, mock_llm, {"todoist": MagicMock()})
+
+    call_kwargs = mock_llm.call_json.call_args[1]
+    assert call_kwargs.get("max_tokens") == config.ACTION_MAX_TOKENS
+
+
 def test_run_aggregate_llm_failure_returns_empty(tmp_path):
     """If LLM/JSON parse fails, _run_aggregate returns [] so the batch can retry."""
     from action_dispatch import _run_aggregate

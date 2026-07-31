@@ -318,7 +318,7 @@ def _action_one(
             "action",
             prompt_text,
             model_override=profile.get("model"),
-            max_tokens=config.LLM_MAX_TOKENS,
+            max_tokens=config.ACTION_MAX_TOKENS,
         )
     except Exception as exc:
         return ActionResult(record_id, "failed", error=f"LLM error: {exc}")
@@ -519,7 +519,7 @@ def _run_aggregate(
             "action",
             prompt_text,
             model_override=profile.get("model"),
-            max_tokens=config.LLM_MAX_TOKENS,
+            max_tokens=config.ACTION_MAX_TOKENS,
         )
     except Exception as exc:
         log.error("[aggregate] LLM call failed — no ActionRuns written: %s", exc)
