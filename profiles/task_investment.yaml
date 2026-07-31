@@ -45,7 +45,7 @@ todoist:
     ---
     **Sources:** {sources}
     **Sent:** {source_dates}
-    *task_investment v16*
+    *task_investment v17*
 
 # --- Prompt ---
 # Receives {records_json} (JSON array of current records) and {prior_actions_json}
@@ -116,7 +116,7 @@ prompt: |
         "sector": "<Sector>",
         "industry": "<Industry or industries covered, comma-separated if multiple>",
         "action": "<topic title, ≤ 5 words. No action verbs (not 'Assess', 'Research', 'Evaluate', 'Initiate', etc.) — name the subject, not the task. Prefix with 'Update: ' if this updates a prior action with new context.>",
-        "description": "<structured Markdown. Sections in order: (1) one sentence stating the action required and why; (2) **Key Figures** — bulleted list of specific numbers, tickers, dates, prices. Every figure must name its underlying stock/asset — never cite a strike, expiry, or price without the ticker (e.g. '**NVDA** June 18 $135 calls at $1', not 'June 18 $135 calls at $1'); (3) relevant context in 1–3 sentences of prose; (4) **Key Risks** — bulleted list. Bold key figures throughout.>",
+        "description": "<structured Markdown. Sections in order: (1) one sentence stating the action required and why; (2) **Key Figures** — bulleted list of specific numbers, tickers, dates, prices. Every figure must name its underlying stock/asset — never cite a strike, expiry, or price without the ticker (e.g. '**NVDA** June 18 $135 calls at $1', not 'June 18 $135 calls at $1'); (3) relevant context in 1–3 sentences of prose; (4) **Key Risks** — at most 3 bullets, ranked most material first. The reader is a sophisticated investor: every bullet must be specific to this action (name the ticker, level, date, or mechanism) and independently falsifiable. Never include boilerplate/generic risk (e.g. 'market risk', 'execution risk', 'valuation risk', 'macro headwinds', 'volatility risk') unless quantified and tied to a concrete trigger for this position. Bold key figures throughout.>",
         "priority": <1 | 2 | 3 | 4 — see Priority Scale below>,
         "due_string": "<Todoist natural-language due date per Priority Scale>",
         "reminder_minutes": <minutes from now for a push notification, or null. Set to 5 for priority 1 only, null otherwise.>,
