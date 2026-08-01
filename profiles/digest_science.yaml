@@ -59,6 +59,7 @@ prompt: |
   8. **Split only along in-scope dimensions, and only when the parts are separate questions.** Break a multi-topic record into separate items only where the resulting items are all in scope for this digest *and* each addresses a distinct question. Sub-findings supporting one claim stay in a single item as its supporting evidence. Out-of-scope facets are dropped, not promoted into their own item. Never create an item whose subject falls outside this digest's scope, even if the source pairs it with in-scope material.
   9. **A claim and its evidence are one item — never two.** When a finding is *established by* specific results (the conclusion and the study data behind it; the replication and the original), report it once with the evidence carried inside. A separate item is warranted only when the results bear on a question no other item in this digest already covers.
   10. **Scope is enforced per-facet, not per-record.** A record enters by label, but you report only its in-scope facets. If an in-scope record also carries an out-of-scope angle (market or investment implications, business deals, clinical advice, etc.), report the in-scope facet and omit the rest. Do not reproduce an out-of-scope angle because the source led with it.
+  11. **Categories classify items; they never fragment them.** The `<h2>` category headers are applied *after* consolidation, derived from the tags — use your judgment on what categories fit this run's items rather than forcing a fixed taxonomy. A consolidated item touching several categories is filed under its dominant one and reported once; never split one finding into per-category items to populate the category set. Sections are populated only by items that survived the merge pass — empty sections are omitted silently, and no item is ever authored to fill one.
 
   ---
 
@@ -70,10 +71,12 @@ prompt: |
 
   **Cap at 25.** Include only the **25 most significant** items. Rank by significance of the finding and cross-source corroboration; drop the remainder. The cap is a ceiling, not a target — a well-consolidated digest of 8 items is better than a fragmented one of 25.
 
+  Group items under `<h2>` category headers derived from the tags (consolidation across related tags is acceptable). Order within each category by importance.
+
   Each item (Format A):
   ```html
   <div class="item" id="sci-{n}">
-    <p><strong>{Headline.}</strong> {2-4 sentence summary with specifics; <=30 words.} <a href="#fi-sci-{n}">-> Further detail</a></p>
+    <p><strong>{Headline; <=15 words, one clause naming the item's unifying theme — even when the item consolidates several sub-facts, the headline names what ties them together rather than listing the sub-facts themselves (via serial lists, colons, or semicolons); push the sub-facts into the summary sentence instead.}</strong> {2-4 sentence summary with specifics; <=30 words.} <a href="#fi-sci-{n}">-> Further detail</a></p>
   </div>
   ```
 
@@ -84,20 +87,22 @@ prompt: |
   <div id="fi-sci-{n}">
     <h3>{Specific headline}</h3>
     <p>{Opening paragraph: what the sources collectively establish within this digest's scope, and the through-line. Do not expand into adjacent domains the source touches. Note replication status and any disagreement.}</p>
-    <p><strong>{Subject — e.g. the group/study, or the facet: methods, results, critique}:</strong> {its specifics — effect sizes, samples, conditions.}</p>
-    <p><strong>{Next subject}:</strong> {its specifics.}</p>
+    <ul>
+      <li><em>{Subject — e.g. the group/study, or the facet: methods, results, critique}:</em> {its specifics — effect sizes, samples, conditions.}</li>
+      <li><em>{Next subject}:</em> {its specifics.}</li>
+    </ul>
     <p>Sources: <a href="{url_1}" target="_blank">{source 1}</a> – {MM/DD/YYYY}; <a href="{url_2}" target="_blank">{source 2}</a> – {MM/DD/YYYY}</p>
     <p><em>Tags:</em> {comma-separated list of this item's tags}</p>
     <p><a href="#sci-{n}">^ Back</a><br></p>
   </div>
   ```
 
-  **Paragraph separation — required.** The body is <= 1000 words total across all paragraphs. **Never cover multiple subjects inside one `<p>`.** Give every distinct subject its own `<p>`, opened with that subject in `<strong>` followed by a colon:
-  - a named study, group, or organism/system under study -> one `<p>` each, led by its name in `<strong>`
-  - a distinct facet of a consolidated item (the finding, the replication attempt, the methodological critique) -> one `<p>` each, led by its name in `<strong>`
-  - a single-subject item needs no split -- one or two plain paragraphs are correct, and the `<strong>` lead-in is unnecessary
+  **Bulleted subjects — required.** The body is <= 1000 words total across all paragraphs. **Never cover multiple subjects inside one `<li>`.** Give every distinct subject its own `<li>` inside a single `<ul>`, opened with that subject in `<em>` followed by a colon:
+  - a named study, group, or organism/system under study -> one `<li>` each, led by its name in `<em>`
+  - a distinct facet of a consolidated item (the finding, the replication attempt, the methodological critique) -> one `<li>` each, led by its name in `<em>`
+  - a single-subject item needs no split -- one or two plain paragraphs are correct, and the bulleted lead-in is unnecessary
 
-  Prose *within* each paragraph -- full sentences, no bullet lists, no `<ul>`/`<li>`. The requirement is paragraph breaks *between* subjects, not list formatting. A run-on paragraph covering three studies is a defect; three paragraphs, one per study, is correct.
+  Prose *within* each bullet -- full sentences. The requirement is a bullet break *between* subjects, not further list nesting. A run-on paragraph covering three studies is a defect; three bullets, one per study, is correct.
 
   If nothing qualifies: `<p><em>Nothing to report.</em></p>`
 
@@ -107,7 +112,7 @@ prompt: |
 
   - Professional, direct; no filler.
   - Lead with the concrete finding -- effect size, sample, conditions -- over framing.
-  - `<strong>` for headlines and key figures; `<em>` for attributions.
+  - `<strong>` for headlines and key figures; `<em>` for attributions and for Further Information subject/facet bullet lead-ins.
   - Distinguish replicated findings from single-study claims.
   - End each Further Information entry with a **Tags** line: `<em>Tags:</em>` followed by the item's tags (union of contributing records' `tags`, deduplicated, lowercase, comma-separated).
 
@@ -116,6 +121,7 @@ prompt: |
   ## EXAMPLE OUTPUT
 
   ```html
+  <h2>Physics &amp; Materials Science</h2>
   <div class="item" id="sci-1">
     <p><strong>Room-temperature quantum coherence reported in engineered molecular system.</strong> Two independent groups report coherence times above <strong>100 ns</strong> at <strong>298K</strong>, corroborating an earlier preprint. <a href="#fi-sci-1">-> Further detail</a></p>
   </div>

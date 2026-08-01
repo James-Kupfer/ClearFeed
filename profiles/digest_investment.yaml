@@ -109,6 +109,7 @@ prompt: |
   13. **Corporate-news facets belong to the Business digest.** Omit corporate-news, M&A, and leadership angles even when attached to a valid trade idea; report only the asset/trade facet here.
   14. **Evidence discipline.** A single data point cannot confirm two theses that imply opposite positioning. If one observation is cited toward more than one thesis (e.g. both a bullish “buildout” and a bearish “bubble” thesis), state which it most supports and treat the other as unresolved rather than claiming simultaneous validation.
   15. If no current records qualify: `<p><em>Nothing to report.</em></p>`
+  16. **A market/portfolio consequence is required, not just a macro-flavored tag.** A record belongs here only if it states or implies an actual market, asset-price, or portfolio consequence — a rate decision's effect on yields, a tariff's effect on margins, a policy's effect on a sector's earnings. Commentary that analyzes an economic or social dynamic without ever connecting to such a consequence (e.g. higher-education cost structure, immigration's labor-market effects analyzed for their own sake) is out of scope — carrying a macro-flavored tag (`macro`/`inflation`/`debt`/`labor_market`) is not sufficient on its own.
 
   ---
 
@@ -126,7 +127,7 @@ prompt: |
   Each item (Format A with source inline):
   ```html
   <div class="item" id="invt-{n}">
-    <p><strong>{Headline.}</strong> {2–4 sentence summary with specifics; <=30 words.} <a href="#fi-invt-{n}">→ Further detail</a></p>
+    <p><strong>{Headline; <=15 words, one clause naming the item's unifying theme — even when the item consolidates several sub-facts, the headline names what ties them together rather than listing the sub-facts themselves (via serial lists, colons, or semicolons); push the sub-facts into the summary sentence instead.}</strong> {2–4 sentence summary with specifics; <=30 words.} <a href="#fi-invt-{n}">→ Further detail</a></p>
   </div>
   ```
 
@@ -137,11 +138,14 @@ prompt: |
   <div id="fi-invt-{n}">
     <h3>{Specific headline — one declarative sentence}</h3>
     <p>{Opening paragraph: what the sources collectively establish within this digest's scope, and the through-line. Do not expand into adjacent domains the source touches. Note any disagreement.}</p>
-    <p><strong>{Subject — e.g. Company Name (TICKER), or the driver/channel}:</strong> {its specifics — figures, levels, thesis, valuation. If the subject has several genuinely separable dimensions (e.g. a stock thesis with performance, catalyst, and valuation), replace this sentence with the bulleted form below instead of running them together.}</p>
-    <p><strong>{Next subject}:</strong></p>
     <ul>
-      <li><strong>{Dimension — e.g. Performance, Catalyst, Valuation, Risk}:</strong> {its detail.}</li>
-      <li><strong>{Next dimension}:</strong> {its detail.}</li>
+      <li><em>{Subject — e.g. Company Name (TICKER), or the driver/channel}:</em> {its specifics — figures, levels, thesis, valuation. If the subject has several genuinely separable dimensions (e.g. a stock thesis with performance, catalyst, and valuation), replace this bullet's text with the nested form below instead of running them together.}</li>
+      <li><em>{Next subject}:</em>
+        <ul>
+          <li><em>{Dimension — e.g. Performance, Catalyst, Valuation, Risk}:</em> {its detail.}</li>
+          <li><em>{Next dimension}:</em> {its detail.}</li>
+        </ul>
+      </li>
     </ul>
     <p>Sources: <a href="{url_1}" target="_blank">{source 1}</a> – {MM/DD/YYYY}</p>
     <p><em>Tags:</em> {comma-separated list of this item's tags}</p>
@@ -149,24 +153,25 @@ prompt: |
   </div>
   ```
 
-  **Paragraph separation — required.** The body is ≤ 1000 words total across all paragraphs. **Never cover multiple subjects inside one `<p>`.** Give every distinct subject its own `<p>`, opened with that subject in `<strong>` followed by a colon:
-  - a named holding, security, or issuer → one `<p>` each, led by `<strong>Company Name (TICKER):</strong>`
-  - a distinct driver, channel, or sub-thesis of a consolidated item (rates, oil, tariffs, shelter) → one `<p>` each, led by its name in `<strong>`
-  - a single-subject item needs no split — one or two plain paragraphs are correct, and the `<strong>` lead-in is unnecessary
+  **Bulleted subjects — required.** The body is ≤ 1000 words total across all paragraphs. **Never cover multiple subjects inside one `<li>`.** Give every distinct subject its own `<li>` inside a single `<ul>`, opened with that subject in `<em>` followed by a colon:
+  - a named holding, security, or issuer → one `<li>` each, led by `<em>Company Name (TICKER):</em>`
+  - a distinct driver, channel, or sub-thesis of a consolidated item (rates, oil, tariffs, shelter) → one `<li>` each, led by its name in `<em>`
+  - a single-subject item needs no split — one or two plain paragraphs are correct, and the bulleted lead-in is unnecessary
 
-  Prose *within* each paragraph by default — full sentences, not a keyword list. The requirement is paragraph breaks *between* subjects, not list formatting. A run-on paragraph covering three tickers is a defect; three paragraphs, one per ticker, is correct.
+  Prose *within* each bullet by default — full sentences, not a keyword list. The requirement is a bullet break *between* subjects, not further list nesting. A run-on paragraph covering three tickers is a defect; three bullets, one per ticker, is correct.
 
-  **Bulleted sub-structure — for a subject with several separable dimensions.** Some subjects (typically a specific holding or trade idea) carry multiple distinct, independently meaningful facts — performance, catalyst/thesis, valuation, risk, financials. When a subject has three or more such dimensions, drop the `<strong>Subject:</strong>` sentence form and instead give the subject a bare `<p><strong>Subject:</strong></p>` header followed by a `<ul>`, one `<li>` per dimension, each led by a short bold label and a colon:
+  **Nested sub-structure — for a subject with several separable dimensions.** Some subjects (typically a specific holding or trade idea) carry multiple distinct, independently meaningful facts — performance, catalyst/thesis, valuation, risk, financials. When a subject has three or more such dimensions, drop the single-bullet sentence form and instead give the subject's `<li><em>Subject:</em>` an inner `<ul>`, one `<li>` per dimension, each led by a short italic label and a colon:
   ```html
-  <p><strong>Company Name (TICKER):</strong></p>
-  <ul>
-    <li><strong>Performance:</strong> Q2 +X%, driven by ...</li>
-    <li><strong>Catalyst:</strong> management's plan / the thesis driving the position.</li>
-    <li><strong>Valuation:</strong> the multiple, and what it does or doesn't price in.</li>
-    <li><strong>Risk / downside:</strong> what could go wrong, or what's already priced.</li>
-  </ul>
+  <li><em>Company Name (TICKER):</em>
+    <ul>
+      <li><em>Performance:</em> Q2 +X%, driven by ...</li>
+      <li><em>Catalyst:</em> management's plan / the thesis driving the position.</li>
+      <li><em>Valuation:</em> the multiple, and what it does or doesn't price in.</li>
+      <li><em>Risk / downside:</em> what could go wrong, or what's already priced.</li>
+    </ul>
+  </li>
   ```
-  Use judgment on which dimensions apply and how many — two or three tight bullets beats forcing a rigid four-part template onto a thin item. A subject with only one or two facts stays as ordinary prose in a single `<p>`; do not bullet-ify a simple subject just to look structured. This is the one exception to "no `<ul>`/`<li>`" — it applies *within* a subject's own block, never as a substitute for the required paragraph break *between* subjects (rule above), and never for narrative/non-enumerable content (a macro thesis, a scientific finding, a regulatory story) where prose synthesis is still required.
+  Use judgment on which dimensions apply and how many — two or three tight bullets beats forcing a rigid four-part template onto a thin item. A subject with only one or two facts stays as ordinary prose in its own bullet; do not nest sub-bullets under a simple subject just to look structured. This nesting applies *within* a subject's own bullet, never as a substitute for the required bullet break *between* subjects (rule above), and never for narrative/non-enumerable content (a macro thesis, a scientific finding, a regulatory story) where prose synthesis is still required.
 
   ---
 
@@ -174,7 +179,7 @@ prompt: |
 
   - Professional, direct; no filler.
   - Lead with the concrete development — figures, tickers, levels, dates.
-  - `<strong>` for headlines, tickers, and key figures; `<em>` for attributions.
+  - `<strong>` for headlines, tickers, and key figures; `<em>` for attributions and for Further Information subject/dimension bullet lead-ins.
   - Prefer specific numbers, names, and dates over vague characterization.
   - End each Further Information entry with a **Tags** line: `<em>Tags:</em>` followed by the item's tags (union of contributing records' `tags`, deduplicated, lowercase, comma-separated).
 

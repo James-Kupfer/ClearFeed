@@ -11,3 +11,4 @@ __pycache__/
 venv/
 task_rights_offering*
 .claude/settings.local.json
+price_optimization/README.md

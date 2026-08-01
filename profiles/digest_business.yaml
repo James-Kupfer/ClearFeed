@@ -86,7 +86,7 @@ prompt: |
   Each item (Format A):
   ```html
   <div class="item" id="biz-{n}">
-    <p><strong>{Headline.}</strong> {2-4 sentence summary with specifics; <=30 words.} <a href="#fi-biz-{n}">-> Further detail</a></p>
+    <p><strong>{Headline; <=15 words, one clause naming the item's unifying theme — even when the item consolidates several sub-facts, the headline names what ties them together rather than listing the sub-facts themselves (via serial lists, colons, or semicolons); push the sub-facts into the summary sentence instead.}</strong> {2-4 sentence summary with specifics; <=30 words.} <a href="#fi-biz-{n}">-> Further detail</a></p>
   </div>
   ```
 
@@ -97,8 +97,10 @@ prompt: |
   <div id="fi-biz-{n}">
     <h3>{Specific headline -- one declarative sentence}</h3>
     <p>{Opening paragraph: what the sources collectively establish within this digest's scope, and the through-line. Do not expand into adjacent domains the source touches. Note any disagreement.}</p>
-    <p><strong>{Subject — e.g. Company Name, or the facet: regulatory review, supply-chain effect}:</strong> {its specifics — figures, terms, dates.}</p>
-    <p><strong>{Next subject}:</strong> {its specifics.}</p>
+    <ul>
+      <li><em>{Subject — e.g. Company Name, or the facet: regulatory review, supply-chain effect}:</em> {its specifics — figures, terms, dates.}</li>
+      <li><em>{Next subject}:</em> {its specifics.}</li>
+    </ul>
     <p>Sources: <a href="{url_1}" target="_blank">{source 1}</a> – {MM/DD/YYYY}; <a href="{url_2}" target="_blank">{source 2}</a> – {MM/DD/YYYY}</p>
     <p><em>Tags:</em> {comma-separated list of this item's tags}</p>
     <p><a href="#biz-{n}">^ Back</a><br></p>
@@ -106,12 +108,12 @@ prompt: |
   ```
   List one source for single-source items; each contributing source for consolidated items.
 
-  **Paragraph separation — required.** The body is <= 1000 words total across all paragraphs. **Never cover multiple subjects inside one `<p>`.** Give every distinct subject its own `<p>`, opened with that subject in `<strong>` followed by a colon:
-  - a named company, deal, or issuer -> one `<p>` each, led by `<strong>Company Name:</strong>`
-  - a distinct facet of a consolidated item (the deal terms, the antitrust review, the competitor response) -> one `<p>` each, led by its name in `<strong>`
-  - a single-subject item needs no split -- one or two plain paragraphs are correct, and the `<strong>` lead-in is unnecessary
+  **Bulleted subjects — required.** The body is <= 1000 words total across all paragraphs. **Never cover multiple subjects inside one `<li>`.** Give every distinct subject its own `<li>` inside a single `<ul>`, opened with that subject in `<em>` followed by a colon:
+  - a named company, deal, or issuer -> one `<li>` each, led by `<em>Company Name:</em>`
+  - a distinct facet of a consolidated item (the deal terms, the antitrust review, the competitor response) -> one `<li>` each, led by its name in `<em>`
+  - a single-subject item needs no split -- one or two plain paragraphs are correct, and the bulleted lead-in is unnecessary
 
-  Prose *within* each paragraph -- full sentences, no bullet lists, no `<ul>`/`<li>`. The requirement is paragraph breaks *between* subjects, not list formatting. A run-on paragraph covering three companies is a defect; three paragraphs, one per company, is correct.
+  Prose *within* each bullet -- full sentences. The requirement is a bullet break *between* subjects, not further list nesting. A run-on paragraph covering three companies is a defect; three bullets, one per company, is correct.
 
   If nothing qualifies: `<p><em>Nothing to report.</em></p>`
 
@@ -121,7 +123,7 @@ prompt: |
 
   - Professional, direct; no filler.
   - Prefer specific numbers, names, dates over vague characterization.
-  - `<strong>` for headlines and key entities (companies, deal values); `<em>` for attributions.
+  - `<strong>` for headlines and key entities (companies, deal values); `<em>` for attributions and for Further Information subject/facet bullet lead-ins.
   - Order within each category by importance, weighting cross-source corroboration.
   - End each Further Information entry with a **Tags** line: `<em>Tags:</em>` followed by the item's tags (union of contributing records' `tags`, deduplicated, lowercase, comma-separated).
 

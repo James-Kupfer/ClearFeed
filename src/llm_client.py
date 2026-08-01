@@ -105,9 +105,17 @@ class AnthropicBackend:
         for block in message.content:
             if getattr(block, "type", None) == "text":
                 return block.text
+        if message.stop_reason == "refusal":
+            raise ValueError(
+                f"Model refused to respond for model={model_id} — content was likely "
+                f"flagged by the model's own safety classifier (e.g. a digest batch "
+                f"dense with exploit/malware-themed items). Not a token-budget issue; "
+                f"retrying with more max_tokens will not help."
+            )
         raise ValueError(
             f"No text block in response content for model={model_id} "
-            f"(block types: {[getattr(b, 'type', None) for b in message.content]})"
+            f"(block types: {[getattr(b, 'type', None) for b in message.content]}, "
+            f"stop_reason={message.stop_reason!r})"
         )
 
 

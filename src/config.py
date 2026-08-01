@@ -85,7 +85,11 @@ LLM_ROUTING = {
 # support up to 128,000. Calls stream (see llm_client), so large values don't
 # risk HTTP timeouts.
 LLM_MAX_TOKENS = 16000      # default for classify/summarize (small/medium outputs)
-DIGEST_MAX_TOKENS = 32000   # digest/synthesis compose — long HTML bodies with many items
+# digest/synthesis compose — long HTML bodies with many items. Bumped 32000 -> 64000 after
+# digest_miscellaneous (55-item band) hit max_tokens with only a ThinkingBlock and no text
+# block at all (stop_reason=max_tokens): Sonnet 5's extended-thinking output alone exhausted
+# 32000 before any visible HTML was emitted. Same failure mode as ACTION_MAX_TOKENS below.
+DIGEST_MAX_TOKENS = 64000
 # Action-dispatch prompt calls (task_*.yaml profiles) route through the "action" operation
 # on config.LLM_ROUTING["action"] (sonnet by default). LLM_MAX_TOKENS (16000) was too small
 # here: Sonnet 5's extended-thinking output alone could exhaust it before any JSON text was

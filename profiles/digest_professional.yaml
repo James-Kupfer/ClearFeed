@@ -60,6 +60,7 @@ prompt: |
   5. **No repeats.** Do not re-report an item covered in a prior digest unless there is a significant update. When you do, prefix the headline with "Update:" and begin the item body with **Update Summary:** — ≤ 50 words (one sentence or short bullets) of only what materially changed.
   6. **Split only along in-scope dimensions, and only when the parts are separate themes.** Break a multi-topic record into separate items only where the resulting items are all in scope for this digest *and* each addresses a distinct question. Facets of one question stay in a single item. Out-of-scope facets are dropped, not promoted into their own item. Never create an item whose subject falls outside this digest's scope, even if the source pairs it with in-scope material.
   7. **Scope is enforced per-facet, not per-record.** A record enters by label, but you report only its in-scope facets. If an in-scope record also carries an out-of-scope angle (market or investment implications, business deals, clinical advice, etc.), report the in-scope facet and omit the rest. Do not reproduce an out-of-scope angle because the source led with it.
+  8. **Categories classify items; they never fragment them.** The `<h2>` category headers are applied *after* consolidation, derived from the tags — use your judgment on what categories fit this run's items rather than forcing a fixed taxonomy. A consolidated item touching several categories is filed under its dominant one and reported once; never split one topic into per-category items to populate the category set. Sections are populated only by items that survived the merge pass — empty sections are omitted silently, and no item is ever authored to fill one.
 
   ---
 
@@ -71,12 +72,12 @@ prompt: |
 
   In scope: governance, regulation, leadership, and career-development content directly relevant to the reader's practice. Out of scope: general AI/tech product news, market or investment takes, and job postings — omit these even when a source pairs them with in-scope material.
 
-  Brief writeup for **every** qualifying item. No category grouping required; order by importance. No Further Information.
+  Brief writeup for **every** qualifying item. No Further Information. Group items under `<h2>` category headers derived from the tags (consolidation across related tags is acceptable). Order within each category by importance.
 
   Each item (Format B):
   ```html
   <div class="item" id="prof-{n}">
-    <p><strong>{Headline.}</strong> {2–4 sentence summary with specifics; <=30 words.} <em>Source: <a href="{url}" target="_blank">{source name}</a> – {MM/DD/YYYY}.</em></p>
+    <p><strong>{Headline; <=15 words, one clause naming the item's unifying theme — even when the item consolidates several sub-facts, the headline names what ties them together rather than listing the sub-facts themselves (via serial lists, colons, or semicolons); push the sub-facts into the summary sentence instead.}</strong> {2–4 sentence summary with specifics; <=30 words.} <em>Source: <a href="{url}" target="_blank">{source name}</a> – {MM/DD/YYYY}.</em></p>
     <p><em>Tags:</em> {comma-separated list of this item's tags}</p>
   </div>
   ```
@@ -99,6 +100,7 @@ prompt: |
   ## EXAMPLE OUTPUT
 
   ```html
+  <h2>Governance &amp; Regulation</h2>
   <div class="item" id="prof-1">
     <p><strong>NIST releases AI RMF 1.1 with new Govern 2.0 explainability tier.</strong> Adds mandatory documentation standards for high-risk deployments that align closely with CRISC frameworks — directly relevant to financial-services AI governance posture. <em>Source: <a href="https://www.nist.gov" target="_blank">NIST.gov</a> – 06/24/2026.</em></p>
     <p><em>Tags:</em> ai_regulation, leadership, career_development</p>
