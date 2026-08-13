@@ -249,7 +249,9 @@ class LLMClient:
                     f"valid JSON — no surrounding text or markdown fences. Every "
                     f'double-quote character inside a string value must be escaped '
                     f'as \\", and every literal newline inside a string value must '
-                    f'be escaped as \\n.'
+                    f'be escaped as \\n. Backslash is ONLY valid before ", \\, /, b, '
+                    f'f, n, r, t, or u — do NOT put a backslash before any other '
+                    f'character (e.g. a dollar sign: write $400, never \\$400).'
                 )
         raise last_exc
 

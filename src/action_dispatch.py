@@ -247,10 +247,20 @@ def _build_todoist_payload(
 
     prompt_result values shadow record values on key collision (prompt wins).
     """
-    from datetime import date
+    from datetime import date, datetime
+    from zoneinfo import ZoneInfo
     namespace: dict[str, Any] = {k: v for k, v in record.items()}
     namespace["today"] = date.today().strftime("%m/%d/%Y")
+    namespace["now"] = datetime.now(ZoneInfo("America/Chicago")).strftime("%m/%d/%Y %H:%M")
     namespace.update(prompt_result)
+
+    # Only surface a timestamp line for updates to a prior action; new actions
+    # get no "Added:" line at all (the record's own received date already
+    # appears further down via {source_dates}).
+    action_title = str(namespace.get("action") or "")
+    namespace["update_line"] = (
+        f"Updated: {namespace['now']}\n\n" if action_title.startswith("Update:") else ""
+    )
 
     content = _render_template(td_config["content"], namespace)
     description = _render_template(str(td_config.get("description") or ""), namespace)
