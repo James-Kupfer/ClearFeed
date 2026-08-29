@@ -183,6 +183,7 @@ def run_dispatch(profile_path: str | Path) -> None:
         max_tokens=config.DIGEST_MAX_TOKENS,
     )
     html_body = _strip_code_fence(html_body)
+    html_body = _fix_back_links(html_body)
 
     # Collect IDs for DigestRuns record
     # sql bands: has "id" and no "profile_name"; digests bands: has "profile_name"
@@ -463,6 +464,40 @@ def _strip_code_fence(text: str) -> str:
     text = re.sub(r"^```[a-zA-Z]*\n?", "", text)   # opening fence
     text = re.sub(r"\n?```\s*$", "", text)           # closing fence
     return text.strip()
+
+
+# Matches a whole Further Information entry: <div id="fi-{slug}-{n}">...</div>.
+# Profiles render these as flat siblings with no nested <div>, so a non-greedy
+# body match correctly stops at each entry's own closing tag.
+_FURTHER_INFO_ENTRY_RE = re.compile(
+    r'(<div\s+id="(fi-[\w-]+)"[^>]*>)(.*?)(</div>)', re.DOTALL
+)
+# The "↑ Back" link inside a Further Information entry, wherever its href points.
+_BACK_LINK_HREF_RE = re.compile(
+    r'(<a\s+href=")[^"]*("[^>]*>[^<]*Back[^<]*</a>)', re.IGNORECASE
+)
+
+
+def _fix_back_links(html: str) -> str:
+    """Repoint each Further Information entry's "Back" link at its own item.
+
+    The digest prompt asks the LLM to write a Back link like href="#aitech-3"
+    that recalls the item number from earlier in a long generation — unlike
+    the forward "Further detail" link, which it writes right next to the
+    item's own id and so stays consistent. In practice the model frequently
+    gets the recalled number wrong, so Back rarely lands on the source item.
+    Fix it deterministically instead: each entry's own id ("fi-aitech-3")
+    already encodes the target ("aitech-3"), so derive the Back href from it
+    rather than trusting the model's free-text recall.
+    """
+
+    def _fix_entry(match: re.Match) -> str:
+        open_tag, entry_id, body, close_tag = match.groups()
+        target = entry_id[len("fi-") :]
+        body = _BACK_LINK_HREF_RE.sub(rf"\g<1>#{target}\g<2>", body, count=1)
+        return f"{open_tag}{body}{close_tag}"
+
+    return _FURTHER_INFO_ENTRY_RE.sub(_fix_entry, html)
 
 
 def _add_pdf_anchors(html: str) -> str:

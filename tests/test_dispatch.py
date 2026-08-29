@@ -73,7 +73,40 @@ def test_period_label_format():
 
 
 # ---------------------------------------------------------------------------
-# Profile loading â€” valid and invalid profiles
+# Further Information "Back" link repair
+# ---------------------------------------------------------------------------
+
+
+def test_fix_back_links_corrects_mismatched_href():
+    from dispatch import _fix_back_links
+
+    html = (
+        '<div class="item" id="aitech-1"><a href="#fi-aitech-1">detail</a></div>'
+        '<div class="item" id="aitech-2"><a href="#fi-aitech-2">detail</a></div>'
+        '<div id="fi-aitech-1"><p><a href="#aitech-2">↑ Back</a></p></div>'
+        '<div id="fi-aitech-2"><p><a href="#aitech-1">↑ Back</a></p></div>'
+    )
+    fixed = _fix_back_links(html)
+    assert '<div id="fi-aitech-1"><p><a href="#aitech-1">↑ Back</a></p></div>' in fixed
+    assert '<div id="fi-aitech-2"><p><a href="#aitech-2">↑ Back</a></p></div>' in fixed
+
+
+def test_fix_back_links_leaves_correct_href_unchanged():
+    from dispatch import _fix_back_links
+
+    html = '<div id="fi-biz-3"><p><a href="#biz-3">↑ Back</a></p></div>'
+    assert _fix_back_links(html) == html
+
+
+def test_fix_back_links_ignores_entries_without_back_link():
+    from dispatch import _fix_back_links
+
+    html = '<div id="fi-sci-1"><h3>Headline</h3><p>Body text.</p></div>'
+    assert _fix_back_links(html) == html
+
+
+# ---------------------------------------------------------------------------
+# Profile loading — valid and invalid profiles
 # ---------------------------------------------------------------------------
 
 
