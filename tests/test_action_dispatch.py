@@ -180,6 +180,31 @@ def test_load_profile_raises_on_wrong_kind(tmp_path):
         _load_profile(p)
 
 
+def test_load_profile_raises_when_system_contains_placeholder(tmp_path):
+    """`system` must be byte-stable for prompt caching to work — a stray
+    {placeholder} would either silently break caching or (since `system` is
+    never interpolated) leak the literal braces into the model's system prompt."""
+    from action_dispatch import _load_profile
+
+    base = yaml.safe_load(_minimal_profile())
+    base["system"] = "Hello {sender}, this must not be allowed."
+    p = tmp_path / "profile.yaml"
+    p.write_text(yaml.dump(base))
+    with pytest.raises(ValueError, match="sender"):
+        _load_profile(p)
+
+
+def test_load_profile_accepts_placeholder_free_system(tmp_path):
+    from action_dispatch import _load_profile
+
+    base = yaml.safe_load(_minimal_profile())
+    base["system"] = "Static instructions with no dynamic content."
+    p = tmp_path / "profile.yaml"
+    p.write_text(yaml.dump(base))
+    profile = _load_profile(p)
+    assert profile["system"] == "Static instructions with no dynamic content."
+
+
 # ---------------------------------------------------------------------------
 # Target registry
 # ---------------------------------------------------------------------------
@@ -436,6 +461,107 @@ def test_run_aggregate_creates_one_task_per_action(tmp_path):
         assert "action" in parsed
 
 
+<<<<<<< Updated upstream
+=======
+def test_run_aggregate_passes_system_and_marks_it_non_cacheable(tmp_path):
+    """Aggregate mode makes exactly one LLM call per profile run, so the next call
+    sharing this system text is a full ingest cycle away — well past the cache
+    TTL. cacheable must be False so cache_control isn't sent for nothing."""
+    from action_dispatch import _run_aggregate
+
+    records = [{"id": 1, "sender": "x@y.com", "subject": "Test", "executive_summary": "X."}]
+    profile = yaml.safe_load(_minimal_aggregate_profile())
+    profile["name"] = "task_investment"
+    profile["system"] = "Static taxonomy and rules."
+
+    mock_llm = MagicMock()
+    mock_llm.call_json.return_value = {"actions": []}
+
+    with patch("action_dispatch.query_prior_actions", return_value=[]):
+        _run_aggregate(profile, records, mock_llm, {})
+
+    call_kwargs = mock_llm.call_json.call_args[1]
+    assert call_kwargs.get("system") == "Static taxonomy and rules."
+    assert call_kwargs.get("cacheable") is False
+
+
+def test_run_aggregate_uses_action_max_tokens(tmp_path):
+    """Regression (2026-07-27): the aggregate LLM call must use config.ACTION_MAX_TOKENS,
+    not the smaller classify/summarize LLM_MAX_TOKENS. Sonnet 5's thinking output could
+    exhaust the smaller budget before emitting any JSON, silently zeroing out every
+    task_investment run (created=0, no error surfaced above debug-level logs)."""
+    from action_dispatch import _run_aggregate
+    import config
+
+    records = [{"id": 1, "sender": "x@y.com", "subject": "Test", "executive_summary": "X."}]
+    profile = yaml.safe_load(_minimal_aggregate_profile())
+    profile["name"] = "task_investment"
+
+    mock_llm = MagicMock()
+    mock_llm.call_json.return_value = {"actions": []}
+
+    with patch("action_dispatch.query_prior_actions", return_value=[]):
+        _run_aggregate(profile, records, mock_llm, {})
+
+    call_kwargs = mock_llm.call_json.call_args[1]
+    assert call_kwargs.get("max_tokens") == config.ACTION_MAX_TOKENS
+    assert config.ACTION_MAX_TOKENS > config.LLM_MAX_TOKENS
+
+
+def test_action_one_uses_action_max_tokens():
+    """Regression (2026-07-27): per-record action calls must also use ACTION_MAX_TOKENS."""
+    from action_dispatch import _action_one
+    import config
+
+    profile = yaml.safe_load(_minimal_profile())
+    record = {"id": 1, "sender": "x@y.com", "subject": "Test"}
+
+    mock_llm = MagicMock()
+    mock_llm.call_json.return_value = {"name": "Test", "description": "Test."}
+
+    _action_one(record, profile, mock_llm, {"todoist": MagicMock()})
+
+    call_kwargs = mock_llm.call_json.call_args[1]
+    assert call_kwargs.get("max_tokens") == config.ACTION_MAX_TOKENS
+
+
+def test_action_one_passes_profile_system_prompt():
+    """Per-record calls must forward profile['system'] as the system= kwarg so it
+    can be prompt-cached across the records this profile processes in a run."""
+    from action_dispatch import _action_one
+
+    profile = yaml.safe_load(_minimal_profile())
+    profile["system"] = "Static per-profile instructions."
+    record = {"id": 1, "sender": "x@y.com", "subject": "Test"}
+
+    mock_llm = MagicMock()
+    mock_llm.call_json.return_value = {"name": "Test", "description": "Test."}
+
+    _action_one(record, profile, mock_llm, {"todoist": MagicMock()})
+
+    call_kwargs = mock_llm.call_json.call_args[1]
+    assert call_kwargs.get("system") == "Static per-profile instructions."
+    # Not explicitly set to False here — per_record calls repeat within a run, so
+    # the default (cacheable=True) is the correct behavior.
+    assert call_kwargs.get("cacheable") is not False
+
+
+def test_action_one_defaults_to_empty_system_when_profile_has_none():
+    from action_dispatch import _action_one
+
+    profile = yaml.safe_load(_minimal_profile())
+    record = {"id": 1, "sender": "x@y.com", "subject": "Test"}
+
+    mock_llm = MagicMock()
+    mock_llm.call_json.return_value = {"name": "Test", "description": "Test."}
+
+    _action_one(record, profile, mock_llm, {"todoist": MagicMock()})
+
+    call_kwargs = mock_llm.call_json.call_args[1]
+    assert call_kwargs.get("system") == ""
+
+
+>>>>>>> Stashed changes
 def test_run_aggregate_llm_failure_returns_empty(tmp_path):
     """If LLM/JSON parse fails, _run_aggregate returns [] so the batch can retry."""
     from action_dispatch import _run_aggregate

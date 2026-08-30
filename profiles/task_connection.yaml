@@ -52,7 +52,9 @@ todoist:
     **Link:** {linked_article_url}
 
 # --- Prompt ---
-# Interpolated with {input} placeholders before the LLM call.
+# `system` is fully static (no {placeholders}) so it's prompt-cached across every
+# record this profile processes in a run — this is the bulk of the prompt, so
+# caching it matters. `prompt` holds only the per-record dynamic fields.
 # Must return strict JSON — keys become available as {placeholders} in the
 # todoist content/description templates above.
 #
@@ -60,7 +62,7 @@ todoist:
 #                shared_connections, at_wells_fargo, accept_url, decline_url,
 #                review_url, description, priority
 # action values: Accept | Decline | Review | Respond | Meeting
-prompt: |
+system: |
   You are triaging an inbound LinkedIn connection request on behalf of a senior
   executive (James — AI Platform Architect, multi-agent orchestration and AI
   governance in financial services). Each record you receive is a single
@@ -153,13 +155,13 @@ prompt: |
     "action"              — one of: "Accept", "Decline", "Review", "Respond",
                             "Meeting".
     "task_content"        — the Todoist task title, phrased per action:
-                              Accept   → "Accept connection from {name}"
-                              Decline  → "Decline connection from {name}"
-                              Review   → "Review connection request from {name}"
-                              Respond  → "Respond to message from {name}"
-                              Meeting  → "Propose meeting time with {name}"
-                            Substitute the actual name; do not leave a literal
-                            {name}.
+                              Accept   → "Accept connection from <name>"
+                              Decline  → "Decline connection from <name>"
+                              Review   → "Review connection request from <name>"
+                              Respond  → "Respond to message from <name>"
+                              Meeting  → "Propose meeting time with <name>"
+                            Substitute the actual name for <name> — do not leave
+                            the placeholder literally in the output.
     "intro_message"       — extracted per Step 2.
     "shared_connections"  — integer extracted per Step 2.
     "at_wells_fargo"      — boolean extracted per Step 2.
@@ -226,6 +228,7 @@ prompt: |
                             sender profile. Auto-declines default to 1 unless
                             time-sensitive. Meeting/Respond default to 3+.
 
+prompt: |
   Sender: {sender}
   Subject: {subject}
   Executive Summary: {executive_summary}

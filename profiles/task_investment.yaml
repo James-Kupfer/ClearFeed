@@ -26,7 +26,18 @@ trigger:
   prior_actions_hours: 672
 
 # --- Todoist task mapping ---
+<<<<<<< Updated upstream
 # {placeholders} resolved from action dict keys returned by the prompt JSON.
+=======
+# {placeholders} resolved from action dict keys returned by the prompt JSON,
+# except {now} and {update_line}, which are resolved by the harness (not the
+# LLM) at task-creation time. {now} is formatted mm/dd/yyyy hh:mm (24-hour
+# clock, America/Chicago). {update_line} renders "**Updated:** {now}\n" when the
+# action title starts with "Update: " (see the `action` field instructions
+# below), and is empty for new actions — no "Added:" line is shown for those.
+# It sits in the footer block directly under **Sent:** so every timestamp in a
+# task description lives in the same place.
+>>>>>>> Stashed changes
 # One task created per action item in the {"actions": [...]} response.
 todoist:
   project: "Business"
@@ -36,8 +47,11 @@ todoist:
     - clearfeed
   content: "{action}"
   description: |
+<<<<<<< Updated upstream
     Added: {today}
 
+=======
+>>>>>>> Stashed changes
     {type} | {sector} | {industry}
 
     {description}
@@ -45,6 +59,7 @@ todoist:
     ---
     **Sources:** {sources}
     **Sent:** {source_dates}
+<<<<<<< Updated upstream
     *task_investment v16*
 
 # --- Prompt ---
@@ -52,6 +67,21 @@ todoist:
 # (JSON array of prior action_content strings from ActionRuns, past 74 hours).
 # Must return strict JSON: {"actions": [{...}, ...]}
 prompt: |
+=======
+    {update_line}*task_investment v25*
+
+# --- Prompt ---
+# `system` is fully static (no {placeholders}) — the whole taxonomy/rules/schema
+# block is identical on every aggregate call, so cacheable=True would pay off if
+# this profile ever ran more than once within the cache TTL (it currently runs
+# once per ingest cycle, so action_dispatch.py passes cacheable=False here; kept
+# split out anyway so the cost model doesn't require touching this file if that
+# changes).
+# `prompt` receives {today_dow}, {records_json} (JSON array of current records),
+# and {prior_actions_json} (JSON array of prior action_content strings from
+# ActionRuns, past 28 days). Must return strict JSON: {"actions": [{...}, ...]}
+system: |
+>>>>>>> Stashed changes
   You are triaging actionable investment intelligence on behalf of a sophisticated
   individual investor. You receive a batch of current investment records and prior
   action context. Return STRICT JSON with no surrounding text or markdown fences.
@@ -95,8 +125,6 @@ prompt: |
 
   ## PRIORITY SCALE
 
-  Today is {today_dow}.
-
   | Priority | Urgency | due_string | reminder_minutes |
   |----------|---------|------------|------------------|
   | 1 | Act today — intraday catalyst, options expiry today, earnings today, trades executed within prior 24 hours | "today" | 5 |
@@ -128,7 +156,8 @@ prompt: |
   }
   ```
 
-  ---
+prompt: |
+  Today is {today_dow}.
 
   ## INPUT
 

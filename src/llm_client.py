@@ -31,7 +31,9 @@ log = logging.getLogger(__name__)
 class Backend(Protocol):
     """Protocol for LLM backends."""
 
-    def call(self, model_id: str, system: str, prompt: str, max_tokens: int) -> str:
+    def call(
+        self, model_id: str, system: str, prompt: str, max_tokens: int, cacheable: bool = True
+    ) -> str:
         """Send a prompt and return the text response."""
         ...
 
@@ -55,12 +57,37 @@ class AnthropicBackend:
             anthropic.RateLimitError,
         )
     )
-    def call(self, model_id: str, system: str, prompt: str, max_tokens: int) -> str:
+    def call(
+        self, model_id: str, system: str, prompt: str, max_tokens: int, cacheable: bool = True
+    ) -> str:
         """Call the Anthropic Messages API via streaming. Returns the first text block.
 
         Streaming is used for all calls so large max_tokens (digests can run to tens
         of thousands of output tokens) don't hit the SDK's non-streaming HTTP timeout.
+
+        cacheable=True marks the system block with cache_control so repeat calls
+        sharing this exact system text within the 5-minute TTL read at ~10% of input
+        cost instead of paying full price each time. Only worth it when the caller
+        expects a follow-up call with the same system text soon (e.g. many records
+        processed in one run against the same classify/summarize/action prompt) — set
+        cacheable=False for one-shot calls (e.g. a digest compose that runs once per
+        schedule cycle), where cache_control would only add the ~1.25x write premium
+        with no read to offset it.
         """
+<<<<<<< Updated upstream
+=======
+        system_param = (
+            [
+                {
+                    "type": "text",
+                    "text": system,
+                    **({"cache_control": {"type": "ephemeral"}} if cacheable else {}),
+                }
+            ]
+            if system
+            else []
+        )
+>>>>>>> Stashed changes
         with self._client.messages.stream(
             model=model_id,
             max_tokens=max_tokens,
@@ -136,6 +163,7 @@ class LLMClient:
         system: str = "",
         model_override: str | None = None,
         max_tokens: int | None = None,
+        cacheable: bool = True,
     ) -> str:
         """Call the LLM for the named operation.
 
@@ -145,6 +173,10 @@ class LLMClient:
             system: optional system prompt.
             model_override: alias ("haiku"/"sonnet") or full model ID; bypasses routing.
             max_tokens: overrides instance default.
+            cacheable: whether to mark `system` with cache_control (see
+                AnthropicBackend.call). Default True; pass False for calls known to
+                run once per system-prompt text (e.g. a digest compose), where
+                caching only adds cost with no read to offset it.
 
         Returns:
             Raw LLM text response.
@@ -155,7 +187,7 @@ class LLMClient:
         )  # fall through if already a full ID
         tokens = max_tokens or self._max_tokens
         log.debug("LLM call: operation=%s model=%s", operation, model_id)
-        return self._backend.call(model_id, system, prompt, tokens)
+        return self._backend.call(model_id, system, prompt, tokens, cacheable)
 
     def call_json(
         self,
@@ -165,6 +197,7 @@ class LLMClient:
         model_override: str | None = None,
         max_tokens: int | None = None,
         json_retries: int = 2,
+        cacheable: bool = True,
     ) -> dict:
         """Like call(), but parses and returns JSON.
 
@@ -179,7 +212,9 @@ class LLMClient:
         current_prompt = prompt
         last_exc: ValueError | None = None
         for attempt in range(1 + json_retries):
-            raw = self.call(operation, current_prompt, system, model_override, max_tokens)
+            raw = self.call(
+                operation, current_prompt, system, model_override, max_tokens, cacheable
+            )
             try:
                 return _parse_json(raw)
             except ValueError as exc:

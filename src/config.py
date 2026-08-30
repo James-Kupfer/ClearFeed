@@ -35,9 +35,17 @@ SMTP_SENDER = "james.kupfer@gmail.com"  # From address shown on outbound digest 
 # the PDF renders the links). The page is deliberately small (~52% of US Letter)
 # so it reads large fit-to-width on a phone (~+35% vs. the original test), with
 # slim left/right margins. Tune the four numbers below to resize.
+#
+# FI_OWN_PAGE starts every Further Information entry on a fresh page. Phone PDF
+# viewers navigate page-by-page and largely ignore a destination's y-coordinate,
+# so without it a "Further detail" link leaves its target near the bottom of the
+# screen. Tested on-device: own-page lands the entry at the top; a single tall
+# page (tried and abandoned) disables the links entirely, because every
+# destination is then on the page already being viewed.
 DIGEST_PDF_ENABLED = True
+DIGEST_PDF_FI_OWN_PAGE = True
 DIGEST_PDF_PAGE_WIDTH_IN = 4.41
-DIGEST_PDF_PAGE_HEIGHT_IN = 5.70
+DIGEST_PDF_PAGE_HEIGHT_IN = 28.50   # 5x the original 5.70in — long scroll, few breaks
 DIGEST_PDF_MARGIN_TB_IN = 0.40   # top/bottom margin
 DIGEST_PDF_MARGIN_LR_IN = 0.20   # left/right margin
 

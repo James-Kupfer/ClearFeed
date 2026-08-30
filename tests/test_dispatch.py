@@ -615,3 +615,77 @@ def test_query_sql_with_columns_returns_col_names_and_rows():
     assert col_names == ["id", "sender"]
     assert rows[0]["sender"] == "x@y.com"
 
+
+
+def test_fi_entries_get_a_page_break_and_items_do_not():
+    """Further Information entries start a new page so links land at the page top."""
+    from dispatch import _start_fi_entries_on_new_page
+
+    out = _start_fi_entries_on_new_page(
+        '<div id="fi-biz-1"><h3>A</h3></div>'
+        '<div class="item" id="biz-1"><p>x</p></div>'
+    )
+
+    assert '<div id="fi-biz-1" style="page-break-before: always;">' in out
+    assert '<div class="item" id="biz-1">' in out  # item divs untouched
+
+
+def test_fi_page_break_preserves_an_existing_style_attribute():
+    from dispatch import _start_fi_entries_on_new_page
+
+    out = _start_fi_entries_on_new_page('<div id="fi-sci-2" style="color:red;"><h3>B</h3></div>')
+
+    assert 'page-break-before: always;' in out
+    assert 'color:red;' in out
+
+
+# ---------------------------------------------------------------------------
+# run_dispatch: LLM call caching flag
+# ---------------------------------------------------------------------------
+
+
+def test_run_dispatch_marks_llm_call_non_cacheable(tmp_path):
+    """A digest's system prompt is dispatched once per schedule cycle (daily/
+    weekly) — days past the cache TTL — so run_dispatch must pass cacheable=False
+    rather than paying the cache_control write premium for a read that never
+    comes."""
+    from dispatch import run_dispatch
+
+    profile_yaml = (
+        "kind: digest\n"
+        "name: test_digest\n"
+        "output: [email]\n"
+        "inputs:\n"
+        "  - section: Test\n"
+        "    source: sql\n"
+        "    sql: SELECT 1\n"
+        "prompt: |\n"
+        "  Static digest instructions.\n"
+    )
+    p = tmp_path / "digest.yaml"
+    p.write_text(profile_yaml)
+
+    from utils import now_cst
+
+    records = [
+        {
+            "id": 1,
+            "subject": "Item 1",
+            "sender": "test@example.com",
+            "received_at": now_cst(),
+            "summary": "Summary 1",
+            "tags": "earnings",
+        }
+    ]
+    mock_llm = MagicMock()
+    mock_llm.call.return_value = "<p>digest body</p>"
+
+    with patch("dispatch.query_sql", return_value=records), \
+         patch("dispatch.LLMClient", return_value=mock_llm), \
+         patch("dispatch.insert_digest_run", return_value=1), \
+         patch("dispatch.send_email") as mock_send:
+        run_dispatch(p)
+
+    mock_send.assert_called_once()
+    call_kwargs = mock_llm.call.call_args[1]
+    assert call_kwargs.get("cacheable") is False
