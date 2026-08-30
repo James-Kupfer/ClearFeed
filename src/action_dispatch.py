@@ -39,10 +39,14 @@ YAML profile schema:
       labels: [clearfeed]
       due_string: null
       content: "Respond to {name}"   # {placeholders} resolved
-      description: |
-        {description}
 
-    prompt: |                # LAST entry
+    system: |                # optional — static instructions, sent as the system
+      ...                    # turn with prompt caching. Must contain NO {placeholders}
+                              # (repeat calls only cache-hit if this text is byte-identical
+                              # every time). Put everything that doesn't vary per record/
+                              # batch here — it's the expensive part worth not re-sending.
+
+    prompt: |                # LAST entry — the per-record/per-batch DYNAMIC tail only
       # per_record: interpolated with record column {placeholders}
       # aggregate:  {records_json} and {prior_actions_json} are available
       ...return strict JSON
@@ -126,6 +130,16 @@ def _load_profile(path: Path) -> dict:
     for required in ("name", "target", "trigger", "prompt"):
         if required not in profile:
             raise ValueError(f"Profile missing required field: {required!r}")
+
+    system_text = profile.get("system", "")
+    stray = re.findall(r"\{(\w+)\}", system_text)
+    if stray:
+        raise ValueError(
+            f"Profile 'system' block contains placeholder(s) {stray!r} — 'system' is "
+            "sent verbatim (never interpolated) so it can be prompt-cached across "
+            "records/runs. Move per-record or per-batch dynamic content into 'prompt' "
+            "instead."
+        )
 
     target = profile["target"]
     if target not in _TARGET_HANDLERS:
@@ -252,6 +266,17 @@ def _build_todoist_payload(
     namespace["today"] = date.today().strftime("%m/%d/%Y")
     namespace.update(prompt_result)
 
+<<<<<<< Updated upstream
+=======
+    # Only surface a timestamp line for updates to a prior action; new actions
+    # get no "Added:" line at all (the record's own received date already
+    # appears in the same footer block via {source_dates}).
+    action_title = str(namespace.get("action") or "")
+    namespace["update_line"] = (
+        f"**Updated:** {namespace['now']}\n" if action_title.startswith("Update:") else ""
+    )
+
+>>>>>>> Stashed changes
     content = _render_template(td_config["content"], namespace)
     description = _render_template(str(td_config.get("description") or ""), namespace)
 
@@ -311,12 +336,15 @@ def _action_one(
     record_id: int = record["id"]
     context = f"record_id={record_id}"
 
-    # Run the LLM prompt
+    # Run the LLM prompt. system (if present) is static across every record this
+    # profile processes this run — cacheable=True (the default) lets the harness's
+    # sequential per-record loop read it back at ~10% cost after the first record.
     prompt_text = _build_prompt_text(profile, record)
     try:
         prompt_result = llm.call_json(
             "action",
             prompt_text,
+            system=profile.get("system", ""),
             model_override=profile.get("model"),
             max_tokens=config.LLM_MAX_TOKENS,
         )
@@ -513,13 +541,22 @@ def _run_aggregate(
         },
     )
 
-    # LLM failure → no ActionRuns written; batch retries next run
+    # LLM failure → no ActionRuns written; batch retries next run.
+    # cacheable=False: aggregate mode makes exactly one LLM call per profile run,
+    # and the next run of this same profile is a full ingest cycle away (well past
+    # the cache TTL) — cache_control here would only add its write premium.
     try:
         result = llm.call_json(
             "action",
             prompt_text,
+            system=profile.get("system", ""),
             model_override=profile.get("model"),
+<<<<<<< Updated upstream
             max_tokens=config.LLM_MAX_TOKENS,
+=======
+            max_tokens=config.ACTION_MAX_TOKENS,
+            cacheable=False,
+>>>>>>> Stashed changes
         )
     except Exception as exc:
         log.error("[aggregate] LLM call failed — no ActionRuns written: %s", exc)

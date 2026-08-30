@@ -117,19 +117,59 @@ prompt: |
   <h2>Further Information</h2>
   <div id="fi-invt-{n}">
     <h3>{Specific headline — one declarative sentence}</h3>
+<<<<<<< Updated upstream
     <p>{≤ 600 words. What the sources collectively establish; note replication status and any disagreement. Prose only.}</p>
+=======
+    <p>{Opening paragraph: what the sources collectively establish within this digest's scope, and the through-line. Do not expand into adjacent domains the source touches. Note any disagreement.}</p>
+    <ul>
+      <li><strong>{Subject — e.g. Company Name (TICKER), or the driver/channel}:</strong> {its specifics — figures, levels, thesis, valuation. If the subject has several genuinely separable dimensions (e.g. a stock thesis with performance, catalyst, and valuation), replace this bullet's text with the nested form below instead of running them together.}</li>
+      <li><strong>{Next subject}:</strong>
+        <ul>
+          <li><strong>{Dimension — e.g. Performance, Catalyst, Valuation, Risk}:</strong> {its detail.}</li>
+          <li><strong>{Next dimension}:</strong> {its detail.}</li>
+        </ul>
+      </li>
+    </ul>
+>>>>>>> Stashed changes
     <p>Sources: <a href="{url_1}" target="_blank">{source 1}</a> – {MM/DD/YYYY}</p>
     <p><em>Tags:</em> {comma-separated list of this item's tags}</p>
     <p><a href="#invt-{n}">↑ Back</a><br></p>
   </div>
   ```
 
+<<<<<<< Updated upstream
+=======
+  **Bulleted subjects — required.** The body is ≤ 1000 words total across all paragraphs. **Never cover multiple subjects inside one `<li>`.** Give every distinct subject its own `<li>` inside a single `<ul>`, opened with that subject in `<strong>` followed by a colon:
+  - a named holding, security, or issuer → one `<li>` each, led by `<strong>Company Name (TICKER):</strong>`
+  - a distinct driver, channel, or sub-thesis of a consolidated item (rates, oil, tariffs, shelter) → one `<li>` each, led by its name in `<strong>`
+  - a single-subject item needs no split — one or two plain paragraphs are correct, and the bulleted lead-in is unnecessary
+
+  Prose *within* each bullet by default — full sentences, not a keyword list. The requirement is a bullet break *between* subjects, not further list nesting. A run-on paragraph covering three tickers is a defect; three bullets, one per ticker, is correct.
+
+  **Nested sub-structure — for a subject with several separable dimensions.** Some subjects (typically a specific holding or trade idea) carry multiple distinct, independently meaningful facts — performance, catalyst/thesis, valuation, risk, financials. When a subject has three or more such dimensions, drop the single-bullet sentence form and instead give the subject's `<li><strong>Subject:</strong>` an inner `<ul>`, one `<li>` per dimension, each led by a short bold label and a colon:
+  ```html
+  <li><strong>Company Name (TICKER):</strong>
+    <ul>
+      <li><strong>Performance:</strong> Q2 +X%, driven by ...</li>
+      <li><strong>Catalyst:</strong> management's plan / the thesis driving the position.</li>
+      <li><strong>Valuation:</strong> the multiple, and what it does or doesn't price in.</li>
+      <li><strong>Risk / downside:</strong> what could go wrong, or what's already priced.</li>
+    </ul>
+  </li>
+  ```
+  Use judgment on which dimensions apply and how many — two or three tight bullets beats forcing a rigid four-part template onto a thin item. A subject with only one or two facts stays as ordinary prose in its own bullet; do not nest sub-bullets under a simple subject just to look structured. This nesting applies *within* a subject's own bullet, never as a substitute for the required bullet break *between* subjects (rule above), and never for narrative/non-enumerable content (a macro thesis, a scientific finding, a regulatory story) where prose synthesis is still required.
+
+>>>>>>> Stashed changes
   ---
 
   ## STYLE RULES
 
   - Professional, direct; no filler.
   - Lead with the concrete development — figures, tickers, levels, dates.
+<<<<<<< Updated upstream
   - `<strong>` for headlines, tickers, and key figures; `<em>` for attributions.
+=======
+  - `<strong>` for headlines, tickers, key figures, and Further Information subject/dimension bullet lead-ins; `<em>` for attributions.
+>>>>>>> Stashed changes
   - Prefer specific numbers, names, and dates over vague characterization.
   - End each Further Information entry with a **Tags** line: `<em>Tags:</em>` followed by the item's tags (union of contributing records' `tags`, deduplicated, lowercase, comma-separated).

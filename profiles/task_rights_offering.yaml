@@ -37,21 +37,14 @@ todoist:
     *task_rights_offering v2*
 
 # --- Prompt ---
-# Receives record fields as {placeholders}.
+# `system` is fully static (no {placeholders}) so it's prompt-cached across every
+# record this profile processes in a run. `prompt` holds only the per-record
+# ## Input section — moved to the end (was first) so the static instructions form
+# an uninterrupted, cacheable prefix; order doesn't affect what the model does with it.
 # Returns strict JSON: {"description": "<structured Markdown>"}
-prompt: |
+system: |
   You are writing the description for a Todoist P1 task about a live rights offering.
   Return STRICT JSON with no surrounding text or markdown fences.
-
-  ## Input
-
-  Subject: {subject}
-
-  Executive Summary:
-  {executive_summary}
-
-  Full Details:
-  {body_text}
 
   ## Required Output
 
@@ -96,3 +89,14 @@ prompt: |
 
   Do not add commentary, hedging, or information not present in the input.
   Keep it tight — this is a reference card, not a summary essay.
+
+prompt: |
+  ## Input
+
+  Subject: {subject}
+
+  Executive Summary:
+  {executive_summary}
+
+  Full Details:
+  {body_text}

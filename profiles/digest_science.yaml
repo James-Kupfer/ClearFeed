@@ -70,13 +70,31 @@ prompt: |
   <h2>Further Information</h2>
   <div id="fi-sci-{n}">
     <h3>{Specific headline}</h3>
+<<<<<<< Updated upstream
     <p>{<= 600 words. What the sources collectively establish; note replication status and any disagreement. Prose only.}</p>
+=======
+    <p>{Opening paragraph: what the sources collectively establish within this digest's scope, and the through-line. Do not expand into adjacent domains the source touches. Note replication status and any disagreement.}</p>
+    <ul>
+      <li><strong>{Subject — e.g. the group/study, or the facet: methods, results, critique}:</strong> {its specifics — effect sizes, samples, conditions.}</li>
+      <li><strong>{Next subject}:</strong> {its specifics.}</li>
+    </ul>
+>>>>>>> Stashed changes
     <p>Sources: <a href="{url_1}" target="_blank">{source 1}</a> – {MM/DD/YYYY}; <a href="{url_2}" target="_blank">{source 2}</a> – {MM/DD/YYYY}</p>
     <p><em>Tags:</em> {comma-separated list of this item's tags}</p>
     <p><a href="#sci-{n}">^ Back</a><br></p>
   </div>
   ```
 
+<<<<<<< Updated upstream
+=======
+  **Bulleted subjects — required.** The body is <= 1000 words total across all paragraphs. **Never cover multiple subjects inside one `<li>`.** Give every distinct subject its own `<li>` inside a single `<ul>`, opened with that subject in `<strong>` followed by a colon:
+  - a named study, group, or organism/system under study -> one `<li>` each, led by its name in `<strong>`
+  - a distinct facet of a consolidated item (the finding, the replication attempt, the methodological critique) -> one `<li>` each, led by its name in `<strong>`
+  - a single-subject item needs no split -- one or two plain paragraphs are correct, and the bulleted lead-in is unnecessary
+
+  Prose *within* each bullet -- full sentences. The requirement is a bullet break *between* subjects, not further list nesting. A run-on paragraph covering three studies is a defect; three bullets, one per study, is correct.
+
+>>>>>>> Stashed changes
   If nothing qualifies: `<p><em>Nothing to report.</em></p>`
 
   ---
@@ -85,7 +103,11 @@ prompt: |
 
   - Professional, direct; no filler.
   - Lead with the concrete finding -- effect size, sample, conditions -- over framing.
+<<<<<<< Updated upstream
   - `<strong>` for headlines and key figures; `<em>` for attributions.
+=======
+  - `<strong>` for headlines, key figures, and Further Information subject/facet bullet lead-ins; `<em>` for attributions.
+>>>>>>> Stashed changes
   - Distinguish replicated findings from single-study claims.
   - End each Further Information entry with a **Tags** line: `<em>Tags:</em>` followed by the item's tags (union of contributing records' `tags`, deduplicated, lowercase, comma-separated).
 

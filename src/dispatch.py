@@ -45,6 +45,7 @@ format: json emits the whole band as a fenced JSON blob.
 format: markdown (default) renders one markdown bullet per record.
 """
 
+import contextlib
 import io
 import logging
 import re
@@ -181,8 +182,13 @@ def run_dispatch(profile_path: str | Path) -> None:
         system=system_prompt,
         model_override=model_override,
         max_tokens=config.DIGEST_MAX_TOKENS,
+        # Each profile's system prompt is dispatched once per schedule cycle
+        # (daily/weekly) — the next call sharing it is far past the cache TTL, so
+        # cache_control would only add its write premium with no read to offset it.
+        cacheable=False,
     )
     html_body = _strip_code_fence(html_body)
+    html_body = _fix_back_links(html_body)
 
     # Collect IDs for DigestRuns record
     # sql bands: has "id" and no "profile_name"; digests bands: has "profile_name"
@@ -465,6 +471,40 @@ def _strip_code_fence(text: str) -> str:
     return text.strip()
 
 
+# Matches a whole Further Information entry: <div id="fi-{slug}-{n}">...</div>.
+# Profiles render these as flat siblings with no nested <div>, so a non-greedy
+# body match correctly stops at each entry's own closing tag.
+_FURTHER_INFO_ENTRY_RE = re.compile(
+    r'(<div\s+id="(fi-[\w-]+)"[^>]*>)(.*?)(</div>)', re.DOTALL
+)
+# The "↑ Back" link inside a Further Information entry, wherever its href points.
+_BACK_LINK_HREF_RE = re.compile(
+    r'(<a\s+href=")[^"]*("[^>]*>[^<]*Back[^<]*</a>)', re.IGNORECASE
+)
+
+
+def _fix_back_links(html: str) -> str:
+    """Repoint each Further Information entry's "Back" link at its own item.
+
+    The digest prompt asks the LLM to write a Back link like href="#aitech-3"
+    that recalls the item number from earlier in a long generation — unlike
+    the forward "Further detail" link, which it writes right next to the
+    item's own id and so stays consistent. In practice the model frequently
+    gets the recalled number wrong, so Back rarely lands on the source item.
+    Fix it deterministically instead: each entry's own id ("fi-aitech-3")
+    already encodes the target ("aitech-3"), so derive the Back href from it
+    rather than trusting the model's free-text recall.
+    """
+
+    def _fix_entry(match: re.Match) -> str:
+        open_tag, entry_id, body, close_tag = match.groups()
+        target = entry_id[len("fi-") :]
+        body = _BACK_LINK_HREF_RE.sub(rf"\g<1>#{target}\g<2>", body, count=1)
+        return f"{open_tag}{body}{close_tag}"
+
+    return _FURTHER_INFO_ENTRY_RE.sub(_fix_entry, html)
+
+
 def _add_pdf_anchors(html: str) -> str:
     """Inject an <a name="X"> before every element with id="X".
 
@@ -474,11 +514,54 @@ def _add_pdf_anchors(html: str) -> str:
     return re.sub(r'(<\w+[^>]*\sid="([^"]+)"[^>]*>)', r'<a name="\2"></a>\1', html)
 
 
+@contextlib.contextmanager
+def _null_zoom_destinations():
+    """Make `<a name>` destinations use `/XYZ left top null` instead of `... 0`.
+
+    Every anchor xhtml2pdf creates goes through reportlab's
+    bookmarkHorizontalAbsolute, which hardcodes zoom=0. Per the PDF spec only
+    *null* means "leave the zoom as the reader has it"; 0 is undefined, and
+    reportlab's own docstring notes readers prefer null. bookmarkPage already
+    defaults to zoom=None, so forward to it.
+    """
+    from reportlab.pdfgen.canvas import Canvas
+
+    original = Canvas.bookmarkHorizontalAbsolute
+
+    def _bookmark(self, key, top, left=0, fit="XYZ", **kw):
+        return Canvas.bookmarkPage(self, key, fit=fit, top=top, left=left, zoom=None)
+
+    Canvas.bookmarkHorizontalAbsolute = _bookmark
+    try:
+        yield
+    finally:
+        Canvas.bookmarkHorizontalAbsolute = original
+
+
+def _start_fi_entries_on_new_page(html: str) -> str:
+    """Force a page break before every Further Information entry (id="fi-...").
+
+    Phone PDF viewers navigate page-by-page and largely ignore a destination's
+    y-coordinate, so a link into the middle of a page leaves its target near the
+    bottom of the screen. Starting each entry on its own page makes the entry the
+    top of the page, which lands it at the top of the screen in any viewer.
+    """
+    def _break(m: re.Match) -> str:
+        tag, attrs = m.group(0), m.group(1)
+        if 'style="' in attrs:
+            return tag.replace('style="', 'style="page-break-before: always;', 1)
+        return tag[:-1] + ' style="page-break-before: always;">'
+
+    return re.sub(r'<div([^>]*\sid="fi-[^"]*"[^>]*)>', _break, html)
+
+
 def _render_digest_pdf(body: str, title: str, period_label: str) -> bytes:
     """Render the digest HTML body to a PDF whose in-document links work on mobile.
 
-    Page size and margins come from config (small page → large text fit-to-width
-    on a phone). Raises on failure so the caller can fall back to no attachment.
+    Page size and margins come from config (small page -> large text fit-to-width
+    on a phone). Each Further Information entry starts a new page so that tapping
+    a "Further detail" link lands it at the top of the screen. Raises on failure
+    so the caller can fall back to no attachment.
     """
     from xhtml2pdf import pisa  # lazy import — keep module importable without it
 
@@ -486,6 +569,11 @@ def _render_digest_pdf(body: str, title: str, period_label: str) -> bytes:
     h = config.DIGEST_PDF_PAGE_HEIGHT_IN
     mtb = config.DIGEST_PDF_MARGIN_TB_IN
     mlr = config.DIGEST_PDF_MARGIN_LR_IN
+
+    prepared = _add_pdf_anchors(body)
+    if config.DIGEST_PDF_FI_OWN_PAGE:
+        prepared = _start_fi_entries_on_new_page(prepared)
+
     doc = f"""<html><head><meta charset="utf-8"><style>
 @page {{ size: {w}in {h}in; margin: {mtb}in {mlr}in; }}
 body {{ font-family: Helvetica, Arial, sans-serif; font-size: 12pt; line-height: 1.4; }}
@@ -494,11 +582,12 @@ a {{ color:#1155cc; }}
 </style></head><body>
 <h1>{title}</h1>
 <p style="color:#666;font-size:10pt;">{period_label}</p>
-{_add_pdf_anchors(body)}
+{prepared}
 </body></html>"""
 
     buf = io.BytesIO()
-    result = pisa.CreatePDF(doc, dest=buf)
+    with _null_zoom_destinations():
+        result = pisa.CreatePDF(doc, dest=buf)
     if result.err:
         raise RuntimeError(f"xhtml2pdf reported {result.err} error(s)")
     return buf.getvalue()

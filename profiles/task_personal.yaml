@@ -45,12 +45,14 @@ todoist:
     **Link:** {linked_article_url}
 
 # --- Prompt ---
-# Interpolated with {input} placeholders before the LLM call.
+# `system` is fully static (no {placeholders}) so it's prompt-cached across every
+# record this profile processes in a run. `prompt` holds only the per-record
+# dynamic fields.
 # Must return strict JSON — keys become available as {placeholders} in the
 # todoist content/description templates above.
 #
 # Required keys: is_not_actionable, action, description, priority
-prompt: |
+system: |
   You are triaging actionable personal intelligence on behalf of a sophisticated
   individual. Each record you receive is a single personal item that has
   been pre-classified as actionable. Analyze the record and return STRICT JSON with
@@ -93,6 +95,7 @@ prompt: |
                            deadlines, and key details. No bullet points — prose only.
     "priority"           — integer 1–4 per Step 4.
 
+prompt: |
   Sender: {sender}
   Subject: {subject}
   Executive Summary: {executive_summary}

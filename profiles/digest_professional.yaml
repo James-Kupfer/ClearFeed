@@ -22,6 +22,13 @@ inputs:
                   AND rt.kind = 'label' AND rt.value = 'Professional')
       AND NOT EXISTS (SELECT 1 FROM RecordTerms rt WHERE rt.id = cr.id
                   AND rt.kind = 'tag' AND rt.value = 'job_search')
+      AND NOT (
+            EXISTS (SELECT 1 FROM RecordTerms rt WHERE rt.id = cr.id
+                    AND rt.kind = 'tag' AND rt.value = 'connection_request')
+        AND EXISTS (SELECT 1 FROM RecordTerms rt WHERE rt.id = cr.id
+                    AND rt.kind = 'tag' AND rt.value IN ('actionable', 'investment_advisory'))
+      )
+      AND (cr.body_text IS NULL OR cr.body_text NOT ILIKE '%Bahnsen Group%')
     ORDER BY cr.received_at DESC LIMIT 200
 - section: Prior Digests
   source: digests
