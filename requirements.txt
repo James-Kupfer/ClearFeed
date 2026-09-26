@@ -9,7 +9,7 @@ html2text==2025.4.15
 google-api-python-client==2.149.0
 google-auth==2.35.0
 google-auth-oauthlib==1.2.1
-Pillow==12.2.0
+Pillow==12.3.0
 emoji==2.14.0
 
 # v2 (file intake) — pinned now for stability
