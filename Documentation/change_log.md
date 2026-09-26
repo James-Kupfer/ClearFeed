@@ -1,5 +1,12 @@
 # Change Log
 
+## 2026-09-26 - Pin xhtml2pdf in requirements
+
+**Type**: fix
+**Files**: requirements.txt
+
+`dispatch._render_digest_pdf` imports `xhtml2pdf`, but it was not listed in requirements. On a fresh install, every digest's PDF render failed and the email was sent without its attachment. Pinned to 0.2.20, the version used to verify the 7pt tag rendering. `pip check` reports no conflicts with the pinned Pillow 12.2.0.
+
 ## 2026-09-26 - Digest tag lines rendered at 7pt gray
 
 **Type**: feature
