@@ -582,3 +582,95 @@ def test_query_sql_with_columns_returns_col_names_and_rows():
     assert col_names == ["id", "sender"]
     assert rows[0]["sender"] == "x@y.com"
 
+
+
+# ---------------------------------------------------------------------------
+# Digest profiles: cross-digest topic ownership
+# ---------------------------------------------------------------------------
+
+_PROFILES_DIR = os.path.join(os.path.dirname(__file__), "..", "profiles")
+_OWNERSHIP_DIGESTS = ("technology", "science", "miscellaneous")
+
+
+def _load_digest(name: str) -> dict:
+    import yaml
+
+    with open(
+        os.path.join(_PROFILES_DIR, f"digest_{name}.yaml"), encoding="utf-8"
+    ) as fh:
+        return yaml.safe_load(fh)
+
+
+def _ownership_block(prompt: str) -> str:
+    start = prompt.index("## TOPIC OWNERSHIP")
+    return prompt[start : prompt.index("---", start)]
+
+
+def _misc_label_set() -> set[str]:
+    import re
+
+    sql = _load_digest("miscellaneous")["inputs"][0]["sql"]
+    match = re.search(r"rt\.kind = 'label' AND rt\.value IN \(([^)]*)\)", sql)
+    return set(re.findall(r"'([^']+)'", match.group(1)))
+
+
+def test_topic_ownership_block_identical_across_digests():
+    """The ownership map must not drift between the digests that share it."""
+    blocks = {
+        n: _ownership_block(_load_digest(n)["prompt"]) for n in _OWNERSHIP_DIGESTS
+    }
+    assert len(set(blocks.values())) == 1, blocks
+
+
+def test_technology_routing_covers_miscellaneous_labels():
+    """Every label feeding the Miscellaneous digest must be routed to Technology on AI tags,
+    otherwise Miscellaneous drops an AI facet that Technology never receives."""
+    sql = _load_digest("technology")["inputs"][0]["sql"]
+    for label in _misc_label_set():
+        assert f"'{label}'" in sql, label
+
+
+def test_ownership_block_missing_raises():
+    """A prompt without the ownership heading fails loudly rather than comparing empty text."""
+    with pytest.raises(ValueError):
+        _ownership_block("## INPUT FORMAT\n---\n")
+
+
+# ---------------------------------------------------------------------------
+# Tag line styling
+# ---------------------------------------------------------------------------
+
+
+def test_style_tag_lines_applies_size_and_color():
+    import config
+    from dispatch import _style_tag_lines
+
+    out = _style_tag_lines("<p><em>Tags:</em> llm, benchmark</p>")
+    assert out == (
+        f'<p style="font-size:{config.DIGEST_TAG_FONT_PT}pt;'
+        f'color:{config.DIGEST_TAG_COLOR};"><em>Tags:</em> llm, benchmark</p>'
+    )
+
+
+def test_style_tag_lines_replaces_existing_attributes_and_ignores_other_paragraphs():
+    from dispatch import _style_tag_lines
+
+    html = '<p>Body text</p>\n<p class="x"> <EM>Tags:</EM> genetics</p>'
+    out = _style_tag_lines(html)
+    assert out.startswith("<p>Body text</p>")
+    assert 'class="x"' not in out
+    assert out.count("font-size:") == 1
+
+
+def test_style_tag_lines_leaves_html_without_tags_unchanged():
+    from dispatch import _style_tag_lines
+
+    html = "<p><em>Note:</em> nothing here</p>"
+    assert _style_tag_lines(html) == html
+
+
+def test_wrap_html_styles_tag_lines():
+    from dispatch import _wrap_html
+
+    out = _wrap_html("<p><em>Tags:</em> llm</p>", "T", "P", 1)
+    assert 'style="font-size:' in out

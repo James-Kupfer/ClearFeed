@@ -35,6 +35,18 @@ prompt: |
 
   ---
 
+  ## TOPIC OWNERSHIP
+
+  The Technology, Science, and Miscellaneous digests share one ownership map so a topic is reported in exactly one of them. A record can reach more than one of these digests, by label or by tag routing; report only the facets this digest owns and drop the rest, even when the source leads with them.
+
+  - **Technology** owns AI systems and the AI industry: models, labs, products, capability claims, benchmarks, AI safety and alignment, AI governance, regulation, and policy (including government, UN, and international action on AI), and AI security (breaches, misuse, and attacks by or against AI systems or labs). Vulnerability disclosures, CVEs, and patch advisories are out of scope for every digest, even when they involve an AI product.
+  - **Science** owns scientific findings, including findings produced by AI systems: what was discovered, the evidence for it, and expert assessment of it.
+  - **Miscellaneous** owns politics, geopolitics, culture, and ideas where AI is absent or incidental.
+
+  Boundary test for AI and science: if the subject is a specific finding about the natural world or mathematics, Science owns it, even when an AI system produced it. If the subject is what AI systems can do in general, how labs behave, or how AI is governed, Technology owns it.
+
+  ---
+
   ## INPUT FORMAT
 
   Records contain: **summary**, **tags**, **source**, **url**, and **emphasis_tags** (weight in prioritization). A **PRIOR DIGESTS** band may be supplied for de-duplication.
