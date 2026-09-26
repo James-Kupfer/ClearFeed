@@ -41,6 +41,10 @@ DIGEST_PDF_PAGE_HEIGHT_IN = 5.70
 DIGEST_PDF_MARGIN_TB_IN = 0.40   # top/bottom margin
 DIGEST_PDF_MARGIN_LR_IN = 0.20   # left/right margin
 
+# --- Digest tag line styling (email body and PDF) ---
+DIGEST_TAG_FONT_PT = 7          # font size of each item's "Tags:" line, in points
+DIGEST_TAG_COLOR = "#888888"    # CSS color of the "Tags:" line
+
 # --- Gmail ingest ---
 EMAIL_MAX_THREADS = 100             # cap per query per ingest run
 EMAIL_INGEST_LOOKBACK_DAYS = 90   # inbox lookback window — emails older than this are ignored

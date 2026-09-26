@@ -634,3 +634,43 @@ def test_ownership_block_missing_raises():
     """A prompt without the ownership heading fails loudly rather than comparing empty text."""
     with pytest.raises(ValueError):
         _ownership_block("## INPUT FORMAT\n---\n")
+
+
+# ---------------------------------------------------------------------------
+# Tag line styling
+# ---------------------------------------------------------------------------
+
+
+def test_style_tag_lines_applies_size_and_color():
+    import config
+    from dispatch import _style_tag_lines
+
+    out = _style_tag_lines("<p><em>Tags:</em> llm, benchmark</p>")
+    assert out == (
+        f'<p style="font-size:{config.DIGEST_TAG_FONT_PT}pt;'
+        f'color:{config.DIGEST_TAG_COLOR};"><em>Tags:</em> llm, benchmark</p>'
+    )
+
+
+def test_style_tag_lines_replaces_existing_attributes_and_ignores_other_paragraphs():
+    from dispatch import _style_tag_lines
+
+    html = '<p>Body text</p>\n<p class="x"> <EM>Tags:</EM> genetics</p>'
+    out = _style_tag_lines(html)
+    assert out.startswith("<p>Body text</p>")
+    assert 'class="x"' not in out
+    assert out.count("font-size:") == 1
+
+
+def test_style_tag_lines_leaves_html_without_tags_unchanged():
+    from dispatch import _style_tag_lines
+
+    html = "<p><em>Note:</em> nothing here</p>"
+    assert _style_tag_lines(html) == html
+
+
+def test_wrap_html_styles_tag_lines():
+    from dispatch import _wrap_html
+
+    out = _wrap_html("<p><em>Tags:</em> llm</p>", "T", "P", 1)
+    assert 'style="font-size:' in out

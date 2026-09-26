@@ -1,5 +1,14 @@
 # Change Log
 
+## 2026-09-26 - Digest tag lines rendered at 7pt gray
+
+**Type**: feature
+**Files**: src/dispatch.py, src/config.py, tests/test_dispatch.py, README.md
+
+Tag lines rendered at body size, which is 12pt in the PDF and the mail client's default in email. `_style_tag_lines` now inlines `font-size` and `color` on each `<p><em>Tags:</em>` paragraph when both the email body and the PDF are rendered. The values are `config.DIGEST_TAG_FONT_PT` and `config.DIGEST_TAG_COLOR`. The stored `DigestRuns.summary_text` is not changed.
+
+Rejected: a CSS class in a `<style>` block, because many mail clients strip head styles. Rejected: asking the LLM to emit the style, because it is non-deterministic across seven profiles.
+
 ## 2026-09-26 - Admit AI jailbreak and AI-attack stories; keep prompt injection excluded
 
 **Type**: fix
