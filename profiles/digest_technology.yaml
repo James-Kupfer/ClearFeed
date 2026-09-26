@@ -37,15 +37,16 @@ inputs:
                     'sandbox_escape', 'rce', 'zero_day', 'steganography', 'sql_injection', 'mfa_bypass',
                     'device_code_phishing', 'credential_stuffing', 'ransomware_staging',
                     'prompt_injection', 'privilege_escalation', 'supply_chain_attack',
-                    'jailbreaking', 'windows_forensics', 'threat_actor', 'ai_enabled_attacks', 'cve',
+                    'windows_forensics', 'threat_actor', 'cve',
                     'cryptominer', 'xmrig', 'lazarus_group', 'botnet', 'honeypot',
-                    'social_engineering', 'identity_threat', 'shadow_ai',
+                    'social_engineering', 'identity_threat',
                     'vulnerability', 'malware'
                   ))
-      -- General cybersecurity content is out of scope unless it is an AI security story.
+      -- General and AI-adjacent security content is out of scope unless it is an AI security story.
       AND NOT (
         EXISTS (SELECT 1 FROM RecordTerms rt WHERE rt.id = cr.id
-                AND rt.kind = 'tag' AND rt.value = 'cybersecurity')
+                AND rt.kind = 'tag' AND rt.value IN (
+                  'cybersecurity', 'jailbreaking', 'ai_enabled_attacks', 'shadow_ai'))
         AND NOT EXISTS (SELECT 1 FROM RecordTerms rt WHERE rt.id = cr.id
                         AND rt.kind = 'tag'
                         AND rt.value IN ('ai_security', 'ai_safety', 'ai_regulation',

@@ -1,5 +1,12 @@
 # Change Log
 
+## 2026-09-26 - Admit AI jailbreak and AI-attack stories; keep prompt injection excluded
+
+**Type**: fix
+**Files**: profiles/digest_technology.yaml
+
+Moved `jailbreaking`, `ai_enabled_attacks`, and `shadow_ai` from the unconditional exclusion to the conditional one. They now exclude a record only when it has no AI-security tag, the same rule as `cybersecurity`. At the user's direction, `prompt_injection` stays unconditionally excluded.
+
 ## 2026-09-26 - Keep AI security stories while excluding cyber patching content
 
 **Type**: fix
