@@ -9,6 +9,13 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent  # src/config.py -> project root
 
+# --- LLM model versions ---
+MODEL_IDS = {
+    "haiku": "claude-haiku-4-5-20251001",
+    "sonnet": "claude-sonnet-5",
+    "opus": "claude-opus-5-5",
+}
+
 # --- Paths ---
 INTAKE_DIR = Path(r"C:\Documents\_intake")  # file-intake watch folder (v2)
 PROCESSED_DIR = INTAKE_DIR / "processed"
@@ -70,11 +77,6 @@ BUCKET_LABELS = [  # Gmail labels auto-created at ingest startup. "Spam" is excl
 ]
 
 # --- LLM ---
-MODEL_IDS = {
-    "haiku": "claude-haiku-4-5-20251001",
-    "sonnet": "claude-sonnet-5",
-    "opus": "claude-opus-5",
-}
 LLM_ROUTING = {
     "summarize": "haiku",  # body_text -> summary + summary_confidence/rationale at ingest
     "classify": "haiku",  # labels + tags + classification_confidence/rationale (works off the summary)
