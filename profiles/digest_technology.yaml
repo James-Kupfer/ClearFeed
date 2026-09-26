@@ -28,8 +28,10 @@ inputs:
                     AND rt.value IN ('Science', 'Miscellaneous', 'Politics', 'Culture', 'Health'))
             AND EXISTS (SELECT 1 FROM RecordTerms rt WHERE rt.id = cr.id
                         AND rt.kind = 'tag'
-                        AND rt.value IN ('ai_safety', 'ai_regulation', 'ai_governance', 'alignment')))
+                        AND rt.value IN ('ai_safety', 'ai_security', 'ai_regulation',
+                                         'ai_governance', 'alignment')))
       )
+      -- Vulnerability, patching, and attack-technique content is always out of scope.
       AND NOT EXISTS (SELECT 1 FROM RecordTerms rt WHERE rt.id = cr.id
                   AND rt.kind = 'tag' AND rt.value IN (
                     'sandbox_escape', 'rce', 'zero_day', 'steganography', 'sql_injection', 'mfa_bypass',
@@ -38,8 +40,17 @@ inputs:
                     'jailbreaking', 'windows_forensics', 'threat_actor', 'ai_enabled_attacks', 'cve',
                     'cryptominer', 'xmrig', 'lazarus_group', 'botnet', 'honeypot',
                     'social_engineering', 'identity_threat', 'shadow_ai',
-                    'cybersecurity', 'vulnerability', 'malware'
+                    'vulnerability', 'malware'
                   ))
+      -- General cybersecurity content is out of scope unless it is an AI security story.
+      AND NOT (
+        EXISTS (SELECT 1 FROM RecordTerms rt WHERE rt.id = cr.id
+                AND rt.kind = 'tag' AND rt.value = 'cybersecurity')
+        AND NOT EXISTS (SELECT 1 FROM RecordTerms rt WHERE rt.id = cr.id
+                        AND rt.kind = 'tag'
+                        AND rt.value IN ('ai_security', 'ai_safety', 'ai_regulation',
+                                         'ai_governance', 'alignment'))
+      )
     ORDER BY cr.received_at DESC LIMIT 200
 - section: Prior Digests
   source: digests
@@ -57,7 +68,7 @@ prompt: |
 
   The Technology, Science, and Miscellaneous digests share one ownership map so a topic is reported in exactly one of them. A record can reach more than one of these digests, by label or by tag routing; report only the facets this digest owns and drop the rest, even when the source leads with them.
 
-  - **Technology** owns AI systems and the AI industry: models, labs, products, capability claims, benchmarks, AI safety and alignment, AI governance, regulation, and policy (including government, UN, and international action on AI), and security incidents involving AI systems or labs.
+  - **Technology** owns AI systems and the AI industry: models, labs, products, capability claims, benchmarks, AI safety and alignment, AI governance, regulation, and policy (including government, UN, and international action on AI), and AI security (breaches, misuse, and attacks by or against AI systems or labs). Vulnerability disclosures, CVEs, and patch advisories are out of scope for every digest, even when they involve an AI product.
   - **Science** owns scientific findings, including findings produced by AI systems: what was discovered, the evidence for it, and expert assessment of it.
   - **Miscellaneous** owns politics, geopolitics, culture, and ideas where AI is absent or incidental.
 

@@ -276,6 +276,6 @@ agriculture_science, astronomy, biology, breakthrough, chemistry, climate, ecolo
 advertisement, affiliate_link, cold_outreach, discount_code, marketing, paid_promotion, promotion, sales_offer, sponsored_content, subscription_pitch, unsubscribe
 
 ### Technology
-agents, ai_capex, ai_chips, ai_funding, ai_governance, ai_product, ai_regulation, ai_research, ai_safety, alignment, api, automation, autonomous_vehicles, benchmark, big_tech, cloud, consumer_electronics, cybersecurity, database, data_center, data_privacy, devtools, fine_tuning, funding_round, hardware, inference, infrastructure, llm, mobile, model_release, multimodal, networking, open_source, open_source_ai, product_launch, quantum_computing, rag, robotics, saas, semiconductor, software, startup, training_compute
+agents, ai_capex, ai_chips, ai_funding, ai_governance, ai_product, ai_regulation, ai_research, ai_safety, ai_security, alignment, api, automation, autonomous_vehicles, benchmark, big_tech, cloud, consumer_electronics, cybersecurity, database, data_center, data_privacy, devtools, fine_tuning, funding_round, hardware, inference, infrastructure, llm, mobile, model_release, multimodal, networking, open_source, open_source_ai, product_launch, quantum_computing, rag, robotics, saas, semiconductor, software, startup, training_compute
 
 </tag_registry>

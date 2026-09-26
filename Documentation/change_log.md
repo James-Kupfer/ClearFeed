@@ -1,5 +1,18 @@
 # Change Log
 
+## 2026-09-26 - Keep AI security stories while excluding cyber patching content
+
+**Type**: fix
+**Files**: profiles/digest_technology.yaml, profiles/digest_science.yaml, profiles/digest_miscellaneous.yaml, prompts/classify.md
+
+Technology's security-tag exclusion also blocked AI security stories. For example, OpenAI agents breaching Australian government servers carried the broad `cybersecurity` tag, was excluded from Technology, and then was dropped by Miscellaneous under the ownership map, so it appeared in no digest. The exclusion was meant for patching and vulnerability content such as CVEs.
+
+- Split the exclusion. Patching, vulnerability, and attack-technique tags (`cve`, `vulnerability`, `rce`, `zero_day`, and similar) still exclude a record unconditionally, even when it involves an AI product. `cybersecurity` now excludes a record only if it has no AI-security tag (`ai_security`, `ai_safety`, `ai_regulation`, `ai_governance`, `alignment`).
+- Added `ai_security` to Technology's tag routing and to the classifier's Technology tag registry. The classifier was already emitting it.
+- The ownership map now names AI security explicitly and puts vulnerability disclosures, CVEs, and patch advisories out of scope for every digest.
+
+Rejected: removing `cybersecurity` from the exclusion. Generic security news without an AI angle would return.
+
 ## 2026-09-26 - Cross-digest topic ownership and tag routing
 
 **Type**: fix
