@@ -59,7 +59,7 @@ def test_call_finds_text_block_after_leading_thinking_block():
     )
     backend = _backend_with_stream(message)
 
-    result = backend.call("claude-sonnet-5", "system", "user", 16000)
+    result = backend.call("claude-sonnet-5-5", "system", "user", 16000)
 
     assert result == '{"tags": ["actionable"]}'
 
@@ -75,7 +75,7 @@ def test_call_raises_clear_error_when_no_text_block_present():
     backend = _backend_with_stream(message)
 
     with pytest.raises(ValueError, match="No text block in response content"):
-        backend.call("claude-sonnet-5", "system", "user", 16000)
+        backend.call("claude-sonnet-5-5", "system", "user", 16000)
 
 
 def test_call_returns_text_when_only_block_is_text():

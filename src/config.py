@@ -72,8 +72,8 @@ BUCKET_LABELS = [  # Gmail labels auto-created at ingest startup. "Spam" is excl
 # --- LLM ---
 MODEL_IDS = {
     "haiku": "claude-haiku-4-5-20251001",
-    "sonnet": "claude-sonnet-5",
-    "opus": "claude-opus-5",
+    "sonnet": "claude-sonnet-5-5",
+    "opus": "claude-opus-5-5",
 }
 LLM_ROUTING = {
     "summarize": "haiku",  # body_text -> summary + summary_confidence/rationale at ingest
@@ -81,7 +81,7 @@ LLM_ROUTING = {
     "digest": "haiku",  # short-window digest compose
     "synthesis": "sonnet",  # cross-period synthesis compose
 }
-# Max output tokens. Haiku 4.5 supports up to 64,000; Sonnet 5 and Opus 5 both
+# Max output tokens. Haiku 4.5 supports up to 64,000; Sonnet 5.5 and Opus 5.5 both
 # support up to 128,000. Calls stream (see llm_client), so large values don't
 # risk HTTP timeouts.
 LLM_MAX_TOKENS = 16000      # default for classify/summarize (small/medium outputs)
