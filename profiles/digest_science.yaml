@@ -18,8 +18,22 @@ inputs:
     FROM ContentRecords cr
     WHERE cr.enrichment_status = 'complete'
       AND cr.received_at >= (now() AT TIME ZONE 'America/Chicago') - interval '240 hours'
-      AND EXISTS (SELECT 1 FROM RecordTerms rt WHERE rt.id = cr.id
-                  AND rt.kind = 'label' AND rt.value = 'Science')
+      AND (
+        EXISTS (SELECT 1 FROM RecordTerms rt WHERE rt.id = cr.id
+                AND rt.kind = 'label' AND rt.value = 'Science')
+        -- Tag routing: AI-driven discoveries in Technology-labelled records need
+        -- a science-domain tag AND an AI-research tag. See TOPIC OWNERSHIP in the prompt.
+        OR (EXISTS (SELECT 1 FROM RecordTerms rt WHERE rt.id = cr.id
+                    AND rt.kind = 'label' AND rt.value = 'Technology')
+            AND EXISTS (SELECT 1 FROM RecordTerms rt WHERE rt.id = cr.id
+                        AND rt.kind = 'tag' AND rt.value IN (
+                          'astronomy', 'biology', 'chemistry', 'ecology', 'evolution', 'genetics',
+                          'geology', 'materials_science', 'mathematics', 'neuroscience',
+                          'oceanography', 'physics'))
+            AND EXISTS (SELECT 1 FROM RecordTerms rt WHERE rt.id = cr.id
+                        AND rt.kind = 'tag'
+                        AND rt.value IN ('ai_research', 'agents', 'ai_agents', 'llm')))
+      )
       AND NOT EXISTS (SELECT 1 FROM RecordTerms rt WHERE rt.id = cr.id
                   AND rt.kind = 'tag' AND rt.value IN ('entertainment', 'music', 'music_rights', 'streaming', 'catalog_sales', 'business', 'startup', 'Pokémon', 'gaming'))
     ORDER BY cr.received_at DESC LIMIT 200
@@ -32,6 +46,18 @@ prompt: |
   # ClearFeed Information Digest — Science
 
   You are a professional intelligence analyst producing a periodic (weekly-to-monthly) information digest for a sophisticated individual reader. This prompt produces the **Science** digest only. Clinical, therapeutic, drug, and personal-health content is out of scope (handled elsewhere) -- exclude it.
+
+  ---
+
+  ## TOPIC OWNERSHIP
+
+  The Technology, Science, and Miscellaneous digests share one ownership map so a topic is reported in exactly one of them. A record can reach more than one of these digests, by label or by tag routing; report only the facets this digest owns and drop the rest, even when the source leads with them.
+
+  - **Technology** owns AI systems and the AI industry: models, labs, products, capability claims, benchmarks, AI safety and alignment, AI governance, regulation, and policy (including government, UN, and international action on AI), and AI security (breaches, misuse, and attacks by or against AI systems or labs). Vulnerability disclosures, CVEs, and patch advisories are out of scope for every digest, even when they involve an AI product.
+  - **Science** owns scientific findings, including findings produced by AI systems: what was discovered, the evidence for it, and expert assessment of it.
+  - **Miscellaneous** owns politics, geopolitics, culture, and ideas where AI is absent or incidental.
+
+  Boundary test for AI and science: if the subject is a specific finding about the natural world or mathematics, Science owns it, even when an AI system produced it. If the subject is what AI systems can do in general, how labs behave, or how AI is governed, Technology owns it.
 
   ---
 

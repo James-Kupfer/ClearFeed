@@ -9,6 +9,13 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent  # src/config.py -> project root
 
+# --- LLM model versions ---
+MODEL_IDS = {
+    "haiku": "claude-haiku-4-5-20251001",
+    "sonnet": "claude-sonnet-5",
+    "opus": "claude-opus-5-5",
+}
+
 # --- Paths ---
 INTAKE_DIR = Path(r"C:\Documents\_intake")  # file-intake watch folder (v2)
 PROCESSED_DIR = INTAKE_DIR / "processed"
@@ -41,6 +48,10 @@ DIGEST_PDF_PAGE_HEIGHT_IN = 5.70
 DIGEST_PDF_MARGIN_TB_IN = 0.40   # top/bottom margin
 DIGEST_PDF_MARGIN_LR_IN = 0.20   # left/right margin
 
+# --- Digest tag line styling (email body and PDF) ---
+DIGEST_TAG_FONT_PT = 7          # font size of each item's "Tags:" line, in points
+DIGEST_TAG_COLOR = "#888888"    # CSS color of the "Tags:" line
+
 # --- Gmail ingest ---
 EMAIL_MAX_THREADS = 100             # cap per query per ingest run
 EMAIL_INGEST_LOOKBACK_DAYS = 90   # inbox lookback window — emails older than this are ignored
@@ -70,11 +81,6 @@ BUCKET_LABELS = [  # Gmail labels auto-created at ingest startup. "Spam" is excl
 ]
 
 # --- LLM ---
-MODEL_IDS = {
-    "haiku": "claude-haiku-4-5-20251001",
-    "sonnet": "claude-sonnet-5",
-    "opus": "claude-opus-5",
-}
 LLM_ROUTING = {
     "summarize": "haiku",  # body_text -> summary + summary_confidence/rationale at ingest
     "classify": "haiku",  # labels + tags + classification_confidence/rationale (works off the summary)
