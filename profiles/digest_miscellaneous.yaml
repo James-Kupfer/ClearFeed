@@ -106,6 +106,8 @@ prompt: |
   </div>
   ```
 
+  **Complete coverage — required.** Every item must have its own Further Information entry, and every "→ Further detail" link must resolve to one. Never omit or stop short of an entry: if output is running long, shorten the remaining entries (a brief opening paragraph plus one or two bullets is sufficient) rather than leaving any item without one.
+
   **Bulleted subjects — required.** The body is ≤ 1000 words total across all paragraphs. **Never cover multiple subjects inside one `<li>`.** Give every distinct subject its own `<li>` inside a single `<ul>`, opened with that subject in `<em>` followed by a colon:
   - a named entity, work, or measure → one `<li>` each, led by its name in `<em>`
   - a distinct facet of a consolidated item (the provisions, the opposition, the likely effects) → one `<li>` each, led by its name in `<em>`

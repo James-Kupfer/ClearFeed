@@ -95,7 +95,10 @@ LLM_MAX_TOKENS = 16000      # default for classify/summarize (small/medium outpu
 # digest_miscellaneous (55-item band) hit max_tokens with only a ThinkingBlock and no text
 # block at all (stop_reason=max_tokens): Sonnet 5's extended-thinking output alone exhausted
 # 32000 before any visible HTML was emitted. Same failure mode as ACTION_MAX_TOKENS below.
-DIGEST_MAX_TOKENS = 64000
+# Bumped again 64000 -> 128000 (the Sonnet 5 / Opus 5 output ceiling) after the Misc digest's
+# Further Information section was cut off at 64000. dispatch._complete_further_information
+# regenerates any entries that still go missing. All digest profiles pin sonnet or opus.
+DIGEST_MAX_TOKENS = 128000
 # Action-dispatch prompt calls (task_*.yaml profiles) route through the "action" operation
 # on config.LLM_ROUTING["action"] (sonnet by default). LLM_MAX_TOKENS (16000) was too small
 # here: Sonnet 5's extended-thinking output alone could exhaust it before any JSON text was

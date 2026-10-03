@@ -183,6 +183,14 @@ def run_dispatch(profile_path: str | Path) -> None:
         max_tokens=config.DIGEST_MAX_TOKENS,
     )
     html_body = _strip_code_fence(html_body)
+    html_body = _complete_further_information(
+        html_body,
+        llm=llm,
+        operation=operation,
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        model_override=model_override,
+    )
 
     # Collect IDs for DigestRuns record
     # sql bands: has "id" and no "profile_name"; digests bands: has "profile_name"
@@ -463,6 +471,107 @@ def _strip_code_fence(text: str) -> str:
     text = re.sub(r"^```[a-zA-Z]*\n?", "", text)   # opening fence
     text = re.sub(r"\n?```\s*$", "", text)           # closing fence
     return text.strip()
+
+
+# Further Information (FI) completeness. Digests emit every summary item first, then one
+# <div id="fi-..."> entry per item, so a max_tokens cut-off (or a model that stops early)
+# always lands in the FI tail: the last entries are truncated or missing and their
+# "Further detail" links point at nothing. Detect that structurally and regenerate only the
+# missing entries.
+_FI_REPAIR_ATTEMPTS = 3
+_FI_LINK_RE = re.compile(r'href="#(fi-[\w-]+)"')
+_FI_START_RE = re.compile(r'<div\b[^>]*\bid="(fi-[\w-]+)"[^>]*>')
+_FI_HEADER = (
+    '<hr style="border: none; border-top: 8px double #333; margin: 32px 0;">\n'
+    "<h2>Further Information</h2>\n"
+)
+
+
+def _drop_incomplete_fi(html: str) -> str:
+    """Cut a trailing FI entry that was truncated before its closing </div>."""
+    starts = list(_FI_START_RE.finditer(html))
+    if starts and "</div>" not in html[starts[-1].end():]:
+        return html[: starts[-1].start()].rstrip()
+    return html
+
+
+def _missing_fi_ids(html: str) -> list[str]:
+    """FI anchor ids linked from the items but with no entry in the body, in link order."""
+    present = {m.group(1) for m in _FI_START_RE.finditer(html)}
+    missing: list[str] = []
+    for m in _FI_LINK_RE.finditer(html):
+        fi_id = m.group(1)
+        if fi_id not in present and fi_id not in missing:
+            missing.append(fi_id)
+    return missing
+
+
+def _strip_dead_fi_links(html: str, fi_ids: list[str]) -> str:
+    """Remove the "Further detail" links for entries that could not be generated."""
+    for fi_id in fi_ids:
+        html = re.sub(
+            rf'\s*<a\s[^>]*href="#{re.escape(fi_id)}"[^>]*>.*?</a>', "", html, flags=re.S
+        )
+    return html
+
+
+def _complete_further_information(
+    html_body: str,
+    *,
+    llm: LLMClient,
+    operation: str,
+    system_prompt: str,
+    user_prompt: str,
+    model_override: str | None,
+) -> str:
+    """Ensure every "Further detail" link has a matching FI entry.
+
+    Missing or truncated entries are regenerated in follow-up calls (the draft is passed
+    back so the model reuses the item numbering and headlines). Links still unresolved
+    after _FI_REPAIR_ATTEMPTS are removed so the digest never ships dead links.
+    """
+    for attempt in range(1, _FI_REPAIR_ATTEMPTS + 1):
+        html_body = _drop_incomplete_fi(html_body)
+        missing = _missing_fi_ids(html_body)
+        if not missing:
+            return html_body
+        log.warning(
+            "Digest missing %d Further Information entr%s (attempt %d/%d): %s",
+            len(missing), "y" if len(missing) == 1 else "ies",
+            attempt, _FI_REPAIR_ATTEMPTS, ", ".join(missing),
+        )
+        repair_prompt = (
+            f"{user_prompt}\n\n---\n\nDRAFT DIGEST SO FAR (its output was cut off before "
+            f"all Further Information entries were written):\n\n{html_body}\n\n---\n\n"
+            f"Write ONLY the missing Further Information entries, in this order: "
+            f"{', '.join(missing)}. Each is a `<div id=\"fi-...\">` entry in exactly the "
+            f"format the instructions specify, covering the draft item with the matching "
+            f"number (the item whose link is `href=\"#fi-...\"`). Keep each entry concise "
+            f"enough that all of them fit. Output no heading, no `<hr>`, no summary items, "
+            f"and no other text."
+        )
+        extra = _strip_code_fence(
+            llm.call(
+                operation,
+                repair_prompt,
+                system=system_prompt,
+                model_override=model_override,
+                max_tokens=config.DIGEST_MAX_TOKENS,
+            )
+        )
+        if not re.search(r"<h2>\s*Further Information\s*</h2>", html_body, re.I):
+            extra = _FI_HEADER + extra
+        html_body = f"{html_body}\n\n{extra}"
+
+    html_body = _drop_incomplete_fi(html_body)
+    missing = _missing_fi_ids(html_body)
+    if missing:
+        log.error(
+            "Further Information still missing after %d repair attempts — removing "
+            "links: %s", _FI_REPAIR_ATTEMPTS, ", ".join(missing),
+        )
+        html_body = _strip_dead_fi_links(html_body, missing)
+    return html_body
 
 
 def _style_tag_lines(html: str) -> str:
