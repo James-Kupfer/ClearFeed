@@ -117,13 +117,6 @@ prompt: |
       <li><strong>{Subject — e.g. the group/study, or the facet: methods, results, critique}:</strong> {its specifics — effect sizes, samples, conditions.}</li>
       <li><strong>{Next subject}:</strong> {its specifics.}</li>
     </ul>
-=======
-    <p>{Opening paragraph: what the sources collectively establish within this digest's scope, and the through-line. Do not expand into adjacent domains the source touches. Note replication status and any disagreement.}</p>
-    <ul>
-      <li><em>{Subject — e.g. the group/study, or the facet: methods, results, critique}:</em> {its specifics — effect sizes, samples, conditions.}</li>
-      <li><em>{Next subject}:</em> {its specifics.}</li>
-    </ul>
->>>>>>> 279d241244594a1d389c5d90946be7f9a6986925
     <p>Sources: <a href="{url_1}" target="_blank">{source 1}</a> – {MM/DD/YYYY}; <a href="{url_2}" target="_blank">{source 2}</a> – {MM/DD/YYYY}</p>
     <p><em>Tags:</em> {comma-separated list of this item's tags}</p>
     <p><a href="#sci-{n}">^ Back</a><br></p>
@@ -137,10 +130,6 @@ prompt: |
 
   Prose *within* each bullet -- full sentences. The requirement is a bullet break *between* subjects, not further list nesting. A run-on paragraph covering three studies is a defect; three bullets, one per study, is correct.
 
-<<<<<<< HEAD
->>>>>>> Stashed changes
-=======
->>>>>>> 279d241244594a1d389c5d90946be7f9a6986925
   If nothing qualifies: `<p><em>Nothing to report.</em></p>`
 
   ---
@@ -149,9 +138,7 @@ prompt: |
 
   - Professional, direct; no filler.
   - Lead with the concrete finding -- effect size, sample, conditions -- over framing.
-=======
-  - `<strong>` for headlines and key figures; `<em>` for attributions and for Further Information subject/facet bullet lead-ins.
->>>>>>> 279d241244594a1d389c5d90946be7f9a6986925
+  - `<strong>` for headlines, key figures, and Further Information subject/facet bullet lead-ins; `<em>` for attributions.
   - Distinguish replicated findings from single-study claims.
   - End each Further Information entry with a **Tags** line: `<em>Tags:</em>` followed by the item's tags (union of contributing records' `tags`, deduplicated, lowercase, comma-separated).
 

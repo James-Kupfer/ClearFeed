@@ -34,14 +34,6 @@ trigger:
 # below), and is empty for new actions — no "Added:" line is shown for those.
 # It sits in the footer block directly under **Sent:** so every timestamp in a
 # task description lives in the same place.
-=======
-# {placeholders} resolved from action dict keys returned by the prompt JSON,
-# except {now} and {update_line}, which are resolved by the harness (not the
-# LLM) at task-creation time. {now} is formatted mm/dd/yyyy hh:mm (24-hour
-# clock, America/Chicago). {update_line} renders "Updated: {now}\n\n" when the
-# action title starts with "Update: " (see the `action` field instructions
-# below), and is empty for new actions — no "Added:" line is shown for those.
->>>>>>> 279d241244594a1d389c5d90946be7f9a6986925
 # One task created per action item in the {"actions": [...]} response.
 todoist:
   project: "Business"
@@ -52,23 +44,12 @@ todoist:
   content: "{action}"
   description: |
     {type} | {sector} | {industry}
-=======
-    {update_line}{type} | {sector} | {industry}
->>>>>>> 279d241244594a1d389c5d90946be7f9a6986925
 
     {description}
 
     ---
     **Sources:** {sources}
     **Sent:** {source_dates}
-    *task_investment v24*
-
-# --- Prompt ---
-# Receives {records_json} (JSON array of current records) and {prior_actions_json}
-# (JSON array of prior action_content strings from ActionRuns, past 28 days).
-# Must return strict JSON: {"actions": [{...}, ...]}
-prompt: |
-=======
     {update_line}*task_investment v25*
 
 # --- Prompt ---
@@ -82,7 +63,6 @@ prompt: |
 # and {prior_actions_json} (JSON array of prior action_content strings from
 # ActionRuns, past 28 days). Must return strict JSON: {"actions": [{...}, ...]}
 system: |
->>>>>>> Stashed changes
   You are triaging actionable investment intelligence on behalf of a sophisticated
   individual investor. You receive a batch of current investment records and prior
   action context. Return STRICT JSON with no surrounding text or markdown fences.

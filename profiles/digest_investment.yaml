@@ -147,25 +147,13 @@ prompt: |
         </ul>
       </li>
     </ul>
-=======
-    <p>{Opening paragraph: what the sources collectively establish within this digest's scope, and the through-line. Do not expand into adjacent domains the source touches. Note any disagreement.}</p>
-    <ul>
-      <li><em>{Subject — e.g. Company Name (TICKER), or the driver/channel}:</em> {its specifics — figures, levels, thesis, valuation. If the subject has several genuinely separable dimensions (e.g. a stock thesis with performance, catalyst, and valuation), replace this bullet's text with the nested form below instead of running them together.}</li>
-      <li><em>{Next subject}:</em>
-        <ul>
-          <li><em>{Dimension — e.g. Performance, Catalyst, Valuation, Risk}:</em> {its detail.}</li>
-          <li><em>{Next dimension}:</em> {its detail.}</li>
-        </ul>
-      </li>
-    </ul>
->>>>>>> 279d241244594a1d389c5d90946be7f9a6986925
     <p>Sources: <a href="{url_1}" target="_blank">{source 1}</a> – {MM/DD/YYYY}</p>
     <p><em>Tags:</em> {comma-separated list of this item's tags}</p>
     <p><a href="#invt-{n}">↑ Back</a><br></p>
   </div>
   ```
 
-  **Bulleted subjects — required.** The body is <= 1000 words total across all paragraphs. **Never cover multiple subjects inside one `<li>`.** Give every distinct subject its own `<li>` inside a single `<ul>`, opened with that subject in `<strong>` followed by a colon:
+  **Bulleted subjects — required.** The body is ≤ 1000 words total across all paragraphs. **Never cover multiple subjects inside one `<li>`.** Give every distinct subject its own `<li>` inside a single `<ul>`, opened with that subject in `<strong>` followed by a colon:
   - a named holding, security, or issuer → one `<li>` each, led by `<strong>Company Name (TICKER):</strong>`
   - a distinct driver, channel, or sub-thesis of a consolidated item (rates, oil, tariffs, shelter) → one `<li>` each, led by its name in `<strong>`
   - a single-subject item needs no split — one or two plain paragraphs are correct, and the bulleted lead-in is unnecessary
@@ -183,24 +171,15 @@ prompt: |
     </ul>
   </li>
   ```
-    </ul>
-  </li>
-  ```
   Use judgment on which dimensions apply and how many — two or three tight bullets beats forcing a rigid four-part template onto a thin item. A subject with only one or two facts stays as ordinary prose in its own bullet; do not nest sub-bullets under a simple subject just to look structured. This nesting applies *within* a subject's own bullet, never as a substitute for the required bullet break *between* subjects (rule above), and never for narrative/non-enumerable content (a macro thesis, a scientific finding, a regulatory story) where prose synthesis is still required.
 
-<<<<<<< HEAD
->>>>>>> Stashed changes
-=======
->>>>>>> 279d241244594a1d389c5d90946be7f9a6986925
   ---
 
   ## STYLE RULES
 
   - Professional, direct; no filler.
   - Lead with the concrete development — figures, tickers, levels, dates.
-=======
-  - `<strong>` for headlines, tickers, and key figures; `<em>` for attributions and for Further Information subject/dimension bullet lead-ins.
->>>>>>> 279d241244594a1d389c5d90946be7f9a6986925
+  - `<strong>` for headlines, tickers, key figures, and Further Information subject/dimension bullet lead-ins; `<em>` for attributions.
   - Prefer specific numbers, names, and dates over vague characterization.
   - End each Further Information entry with a **Tags** line: `<em>Tags:</em>` followed by the item's tags (union of contributing records' `tags`, deduplicated, lowercase, comma-separated).
 

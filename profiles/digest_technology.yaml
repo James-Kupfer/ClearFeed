@@ -132,13 +132,6 @@ prompt: |
       <li><strong>{Subject — e.g. Model/Product Name, lab, or the facet: benchmarks, pricing, tooling}:</strong> {its specifics — figures, versions, dates.}</li>
       <li><strong>{Next subject}:</strong> {its specifics.}</li>
     </ul>
-=======
-    <p>{Opening paragraph: what the sources collectively establish within this digest's scope, and the through-line. Do not expand into adjacent domains the source touches. Note any disagreement.}</p>
-    <ul>
-      <li><em>{Subject — e.g. Model/Product Name, lab, or the facet: benchmarks, pricing, tooling}:</em> {its specifics — figures, versions, dates.}</li>
-      <li><em>{Next subject}:</em> {its specifics.}</li>
-    </ul>
->>>>>>> 279d241244594a1d389c5d90946be7f9a6986925
     <p>Sources: <a href="{url_1}" target="_blank">{source 1}</a> – {MM/DD/YYYY}; <a href="{url_2}" target="_blank">{source 2}</a> – {MM/DD/YYYY}</p>
     <p><em>Tags:</em> {comma-separated list of this item's tags}</p>
     <p><a href="#aitech-{n}">↑ Back</a><br></p>
@@ -146,17 +139,13 @@ prompt: |
   ```
   List one source for single-source items; each contributing source for consolidated items.
 
-  **Bulleted subjects — required.** The body is <= 1000 words total across all paragraphs. **Never cover multiple subjects inside one `<li>`.** Give every distinct subject its own `<li>` inside a single `<ul>`, opened with that subject in `<strong>` followed by a colon:
+  **Bulleted subjects — required.** The body is ≤ 1000 words total across all paragraphs. **Never cover multiple subjects inside one `<li>`.** Give every distinct subject its own `<li>` inside a single `<ul>`, opened with that subject in `<strong>` followed by a colon:
   - a named model, product, lab, or vendor → one `<li>` each, led by `<strong>Model/Product Name:</strong>`
   - a distinct facet of a consolidated item (the release itself, benchmark results, pricing response, tooling implications) → one `<li>` each, led by its name in `<strong>`
   - a single-subject item needs no split — one or two plain paragraphs are correct, and the bulleted lead-in is unnecessary
 
   Prose *within* each bullet — full sentences. The requirement is a bullet break *between* subjects, not further list nesting. A run-on paragraph covering three model releases is a defect; three bullets, one per release, is correct.
 
-<<<<<<< HEAD
->>>>>>> Stashed changes
-=======
->>>>>>> 279d241244594a1d389c5d90946be7f9a6986925
   If nothing qualifies: `<p><em>Nothing to report.</em></p>`
 
   ---
@@ -165,9 +154,7 @@ prompt: |
 
   - Professional, direct; no filler ("it's important to note", "in conclusion").
   - Prefer specific numbers, names, dates over vague characterization.
-=======
-  - `<strong>` for headlines and key entities; `<em>` for attributions and for Further Information subject/facet bullet lead-ins.
->>>>>>> 279d241244594a1d389c5d90946be7f9a6986925
+  - `<strong>` for headlines, key entities, and Further Information subject/facet bullet lead-ins; `<em>` for attributions.
   - Order within each category by importance, weighting cross-source corroboration.
   - End each Further Information entry with a **Tags** line: `<em>Tags:</em>` followed by the item's tags (union of contributing records' `tags`, deduplicated, lowercase, comma-separated).
 
