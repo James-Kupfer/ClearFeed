@@ -13,6 +13,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent  # src/config.py -> project ro
 MODEL_IDS = {
     "haiku": "claude-haiku-4-5-20251001",
     "sonnet": "claude-sonnet-5",
+    "sonnet-5.5": "claude-sonnet-5-5",  # digest profiles; "sonnet" stays on 5 for ingest/action
     "opus": "claude-opus-5-5",
 }
 

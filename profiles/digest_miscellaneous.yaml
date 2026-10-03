@@ -1,6 +1,6 @@
 kind: digest
 name: digest_miscellaneous
-model: sonnet
+model: sonnet-5.5
 recipient: digests@kupfer.me
 subject_template: 'Miscellaneous Digest - {period_end_date}'
 dedup_schedule: weekly_saturday
@@ -102,50 +102,16 @@ prompt: |
     </ul>
     <p>Sources: <a href="{url_1}" target="_blank">{source 1}</a> – {MM/DD/YYYY}</p>
     <p><em>Tags:</em> {comma-separated list of this item's tags}</p>
-  </div>
-  ```
-    <p><em>Tags:</em> {comma-separated list of this item's tags}</p>
+    <p><a href="#misc-{n}">↑ Back</a><br></p>
   </div>
   ```
 
-For a consolidated multi-source item: `<em>Sources: <a …>A</a> – {date_1}; <a …>B</a> – {date_2}.</em>`
-  **Bulleted subjects — required.** The body is <= 1000 words total across all paragraphs. **Never cover multiple subjects inside one `<li>`.** Give every distinct subject its own `<li>` inside a single `<ul>`, opened with that subject in `<strong>` followed by a colon:
+  **Bulleted subjects — required.** The body is ≤ 1000 words total across all paragraphs. **Never cover multiple subjects inside one `<li>`.** Give every distinct subject its own `<li>` inside a single `<ul>`, opened with that subject in `<strong>` followed by a colon:
   - a named entity, work, or measure → one `<li>` each, led by its name in `<strong>`
   - a distinct facet of a consolidated item (the provisions, the opposition, the likely effects) → one `<li>` each, led by its name in `<strong>`
   - a single-subject item needs no split — one or two plain paragraphs are correct, and the bulleted lead-in is unnecessary
 
   Prose *within* each bullet — full sentences. The requirement is a bullet break *between* subjects, not further list nesting. A run-on paragraph covering three subjects is a defect; three bullets, one per subject, is correct.
-=======
-    <p><strong>{Headline; <=15 words, one clause naming the item's unifying theme — even when the item consolidates several sub-facts, the headline names what ties them together rather than listing the sub-facts themselves (via serial lists, colons, or semicolons); push the sub-facts into the summary sentence instead.}</strong> {2–4 sentence summary with specifics; <=30 words.} <a href="#fi-misc-{n}">→ Further detail</a></p>
-  </div>
-  ```
-
-  Then Further Information once, after all items:
-  ```html
-  <hr style="border: none; border-top: 8px double #333; margin: 32px 0;">
-  <h2>Further Information</h2>
-  <div id="fi-misc-{n}">
-    <h3>{Specific headline — one declarative sentence}</h3>
-    <p>{Opening paragraph: what the sources collectively establish within this digest's scope, and the through-line. Do not expand into adjacent domains the source touches. Note any disagreement.}</p>
-    <ul>
-      <li><em>{Subject — e.g. the named entity, or the facet: provisions, opposition, effects}:</em> {its specifics — figures, names, dates.}</li>
-      <li><em>{Next subject}:</em> {its specifics.}</li>
-    </ul>
-    <p>Sources: <a href="{url_1}" target="_blank">{source 1}</a> – {MM/DD/YYYY}</p>
-    <p><em>Tags:</em> {comma-separated list of this item's tags}</p>
-    <p><a href="#misc-{n}">↑ Back</a><br></p>
-  </div>
-  ```
-
-  **Complete coverage — required.** Every item must have its own Further Information entry, and every "→ Further detail" link must resolve to one. Never omit or stop short of an entry: if output is running long, shorten the remaining entries (a brief opening paragraph plus one or two bullets is sufficient) rather than leaving any item without one.
-
-  **Bulleted subjects — required.** The body is ≤ 1000 words total across all paragraphs. **Never cover multiple subjects inside one `<li>`.** Give every distinct subject its own `<li>` inside a single `<ul>`, opened with that subject in `<em>` followed by a colon:
-  - a named entity, work, or measure → one `<li>` each, led by its name in `<em>`
-  - a distinct facet of a consolidated item (the provisions, the opposition, the likely effects) → one `<li>` each, led by its name in `<em>`
-  - a single-subject item needs no split — one or two plain paragraphs are correct, and the bulleted lead-in is unnecessary
-
-  Prose *within* each bullet — full sentences. The requirement is a bullet break *between* subjects, not further list nesting. A run-on paragraph covering three subjects is a defect; three bullets, one per subject, is correct.
->>>>>>> 279d241244594a1d389c5d90946be7f9a6986925
 
   If nothing qualifies: `<p><em>Nothing to report.</em></p>`
 
@@ -156,11 +122,7 @@ For a consolidated multi-source item: `<em>Sources: <a …>A</a> – {date_1}; <
   - Professional, direct; no filler.
   - Prefer specific numbers, names, dates over vague characterization.
   - `<strong>` for headlines, key entities, and Further Information subject/facet bullet lead-ins; `<em>` for source attributions.
-  - End each item and each Further Information entry with a **Tags** line: `<em>Tags:</em>` followed by the item's tags (union of contributing records' `tags`, deduplicated, lowercase, comma-separated).
-=======
-  - `<strong>` for headlines and key entities; `<em>` for source attributions and for Further Information subject/facet bullet lead-ins.
   - End each Further Information entry with a **Tags** line: `<em>Tags:</em>` followed by the item's tags (union of contributing records' `tags`, deduplicated, lowercase, comma-separated).
->>>>>>> 279d241244594a1d389c5d90946be7f9a6986925
 
   ---
 

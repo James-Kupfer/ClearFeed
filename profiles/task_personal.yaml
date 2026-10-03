@@ -1,7 +1,7 @@
 kind: action
 name: task_personal
 target: todoist
-model: haiku
+model: sonnet-5.5
 
 # --- Trigger ---
 # Scans Personal records tagged actionable in the last window_hours that

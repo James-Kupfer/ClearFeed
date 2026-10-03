@@ -486,24 +486,6 @@ def test_run_aggregate_passes_system_and_marks_it_non_cacheable(tmp_path):
 def test_run_aggregate_uses_action_max_tokens(tmp_path):
     """Regression (2026-07-27): the aggregate LLM call must use config.ACTION_MAX_TOKENS,
     not the smaller classify/summarize LLM_MAX_TOKENS. Sonnet 5's thinking output could
-    exceed the smaller limit and lose required action content."""
-    from action_dispatch import _run_aggregate
-
-    records = [{"id": 1, "sender": "x@y.com", "subject": "Test", "executive_summary": "X."}]
-    profile = yaml.safe_load(_minimal_aggregate_profile())
-    profile["name"] = "task_investment"
-
-    mock_llm = MagicMock()
-    mock_llm.call_json.return_value = {"actions": []}
-
-    with patch("action_dispatch.query_prior_actions", return_value=[]):
-        _run_aggregate(profile, records, mock_llm, {})
-
-    call_kwargs = mock_llm.call_json.call_args[1]
-    assert call_kwargs.get("max_tokens") == config.ACTION_MAX_TOKENS
-def test_run_aggregate_uses_action_max_tokens(tmp_path):
-    """Regression (2026-07-27): the aggregate LLM call must use config.ACTION_MAX_TOKENS,
-    not the smaller classify/summarize LLM_MAX_TOKENS. Sonnet 5's thinking output could
     exhaust the smaller budget before emitting any JSON, silently zeroing out every
     task_investment run (created=0, no error surfaced above debug-level logs)."""
     from action_dispatch import _run_aggregate
@@ -541,7 +523,6 @@ def test_action_one_uses_action_max_tokens():
     assert call_kwargs.get("max_tokens") == config.ACTION_MAX_TOKENS
 
 
-<<<<<<< HEAD
 def test_action_one_passes_profile_system_prompt():
     """Per-record calls must forward profile['system'] as the system= kwarg so it
     can be prompt-cached across the records this profile processes in a run."""
@@ -578,9 +559,6 @@ def test_action_one_defaults_to_empty_system_when_profile_has_none():
     assert call_kwargs.get("system") == ""
 
 
->>>>>>> Stashed changes
-=======
->>>>>>> 279d241244594a1d389c5d90946be7f9a6986925
 def test_run_aggregate_llm_failure_returns_empty(tmp_path):
     """If LLM/JSON parse fails, _run_aggregate returns [] so the batch can retry."""
     from action_dispatch import _run_aggregate

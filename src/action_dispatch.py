@@ -275,16 +275,7 @@ def _build_todoist_payload(
     namespace["update_line"] = (
         f"**Updated:** {namespace['now']}\n" if action_title.startswith("Update:") else ""
     )
-=======
-    # Only surface a timestamp line for updates to a prior action; new actions
-    # get no "Added:" line at all (the record's own received date already
-    # appears further down via {source_dates}).
-    action_title = str(namespace.get("action") or "")
-    namespace["update_line"] = (
-        f"Updated: {namespace['now']}\n\n" if action_title.startswith("Update:") else ""
-    )
 
->>>>>>> 279d241244594a1d389c5d90946be7f9a6986925
     content = _render_template(td_config["content"], namespace)
     description = _render_template(str(td_config.get("description") or ""), namespace)
 
@@ -561,9 +552,6 @@ def _run_aggregate(
             model_override=profile.get("model"),
             max_tokens=config.ACTION_MAX_TOKENS,
             cacheable=False,
-=======
-            max_tokens=config.ACTION_MAX_TOKENS,
->>>>>>> 279d241244594a1d389c5d90946be7f9a6986925
         )
     except Exception as exc:
         log.error("[aggregate] LLM call failed — no ActionRuns written: %s", exc)

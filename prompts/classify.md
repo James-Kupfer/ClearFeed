@@ -238,7 +238,6 @@ Reasoning: the bulk of the piece is analytical (a structural argument about cust
 }
 ```
 
-<<<<<<< HEAD
 Example 7 — Spam vs. Business, a paid-newsletter subscription CTA does not override dominant substantive analysis.
 Reasoning: the email covers four distinct named-ticker situations, each with a specific thesis, valuation figure, or price target and (for one) a dated catalyst — this is the dominant content by volume and specificity. A "upgrade to our paid tier" CTA appears, but it is a minor appended pitch, not what the email is for — applying the Spam dominance test, the analysis content overwhelms the pitch, so Spam does not apply; keep the topical label and tag the CTA as subscription_pitch. Two of the four situations carry a named ticker plus a price target or valuation entry, meeting the actionable trigger.
 ```json
@@ -264,11 +263,6 @@ Reasoning: the email covers four distinct named-ticker situations, each with a s
 
 </worked_examples>
 
->>>>>>> Stashed changes
-=======
-</worked_examples>
-
->>>>>>> 279d241244594a1d389c5d90946be7f9a6986925
 <tag_registry>
 
 ### Handling
