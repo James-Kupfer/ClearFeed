@@ -1,7 +1,7 @@
 kind: action
 name: task_connection
 target: todoist
-model: sonnet
+model: sonnet-5.5
 
 # --- Trigger ---
 # Scans records classified in the last window_hours that haven't been actioned

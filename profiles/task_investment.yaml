@@ -2,7 +2,7 @@ kind: action
 name: task_investment
 target: todoist
 mode: aggregate
-model: sonnet
+model: sonnet-5.5
 
 # --- Trigger ---
 # Scans Investment records tagged actionable within the last 14 days that

@@ -2,7 +2,7 @@ kind: action
 name: task_rights_offering
 target: todoist
 mode: per_record
-model: haiku
+model: sonnet-5.5
 
 # --- Trigger ---
 # Picks up any unactioned rights offering record published by ROM.
