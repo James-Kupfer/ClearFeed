@@ -5,7 +5,7 @@ mode: aggregate
 model: sonnet
 
 # --- Trigger ---
-# Scans Investment records tagged actionable within the last 24 hours that
+# Scans Investment records tagged actionable within the last 14 days that
 # haven't been actioned by this profile yet. One LLM call over all records
 # returns a JSON blob; one Todoist task is created per Type/Sector/Industry action.
 trigger:
@@ -26,9 +26,6 @@ trigger:
   prior_actions_hours: 672
 
 # --- Todoist task mapping ---
-<<<<<<< Updated upstream
-# {placeholders} resolved from action dict keys returned by the prompt JSON.
-=======
 # {placeholders} resolved from action dict keys returned by the prompt JSON,
 # except {now} and {update_line}, which are resolved by the harness (not the
 # LLM) at task-creation time. {now} is formatted mm/dd/yyyy hh:mm (24-hour
@@ -37,7 +34,14 @@ trigger:
 # below), and is empty for new actions — no "Added:" line is shown for those.
 # It sits in the footer block directly under **Sent:** so every timestamp in a
 # task description lives in the same place.
->>>>>>> Stashed changes
+=======
+# {placeholders} resolved from action dict keys returned by the prompt JSON,
+# except {now} and {update_line}, which are resolved by the harness (not the
+# LLM) at task-creation time. {now} is formatted mm/dd/yyyy hh:mm (24-hour
+# clock, America/Chicago). {update_line} renders "Updated: {now}\n\n" when the
+# action title starts with "Update: " (see the `action` field instructions
+# below), and is empty for new actions — no "Added:" line is shown for those.
+>>>>>>> 279d241244594a1d389c5d90946be7f9a6986925
 # One task created per action item in the {"actions": [...]} response.
 todoist:
   project: "Business"
@@ -47,24 +51,21 @@ todoist:
     - clearfeed
   content: "{action}"
   description: |
-<<<<<<< Updated upstream
-    Added: {today}
-
-=======
->>>>>>> Stashed changes
     {type} | {sector} | {industry}
+=======
+    {update_line}{type} | {sector} | {industry}
+>>>>>>> 279d241244594a1d389c5d90946be7f9a6986925
 
     {description}
 
     ---
     **Sources:** {sources}
     **Sent:** {source_dates}
-<<<<<<< Updated upstream
-    *task_investment v16*
+    *task_investment v24*
 
 # --- Prompt ---
 # Receives {records_json} (JSON array of current records) and {prior_actions_json}
-# (JSON array of prior action_content strings from ActionRuns, past 74 hours).
+# (JSON array of prior action_content strings from ActionRuns, past 28 days).
 # Must return strict JSON: {"actions": [{...}, ...]}
 prompt: |
 =======
@@ -90,36 +91,66 @@ system: |
 
   ## CLASSIFICATION TAXONOMY
 
-  Classify each action by **Type** and **Sector/Industry**:
+  Classify each action by **Type**, **Sector**, and **Industry**. Sector names can repeat across
+  Types with different meanings (e.g. "Materials" under Commodity is the raw-materials complex;
+  under Equity it is materials-sector stocks) — always pick the Sector/Industry from within the
+  matching Type below, never mix industries across Types.
 
-  **Types:** Fixed-Income | Commodity | Crypto | Equity | Private
+  **Types:** Commodity | Crypto | Equity | Fixed-Income | Miscellaneous | Macro
 
-  **Sectors and Industries:**
+  **Commodity sectors:**
+  - **Diversified Commodities:** Diversified Commodities
+  - **Non-Diversified Commodities:** Agricultural Commodities
+  - **Energy:** Diversified Energy · Oil & Gas E&P - Major · Oil & Gas Equipment & Services · Oil & Gas E&P - Junior · Oil & Gas Midstream · Renewable Energy · Royalty · Specialty Processing
+  - **Materials:** Chemicals · Diversified Materials · Precious Metals & Minerals
+  - **Mining:** Diversified Mining · Exploration · Metals & Mining · Royalty
 
-  - **Energy:** Oil & Gas E&P · Oil & Gas Midstream · Oil & Gas Refining & Marketing · Oil & Gas Equipment & Services · Coal & Consumable Fuels · Renewable Energy
-  - **Materials:** Chemicals · Construction Materials · Containers & Packaging · Metals & Mining · Paper & Forest Products · Precious Metals & Minerals
-  - **Industrials:** Aerospace & Defense · Building Products · Construction & Engineering · Electrical Equipment · Industrial Conglomerates · Machinery · Trading Companies & Distributors · Commercial Services & Supplies · Professional Services · Air Freight & Logistics · Airlines · Marine · Road & Rail · Transportation Infrastructure
-  - **Consumer Discretionary:** Auto Components · Automobiles · Household Durables · Leisure Products · Textiles, Apparel & Luxury Goods · Hotels, Restaurants & Leisure · Diversified Consumer Services · Media · Interactive Media & Services · Distributors · Internet & Direct Marketing Retail · Multiline Retail · Specialty Retail
-  - **Consumer Staples:** Food & Staples Retailing · Food Products · Beverages · Tobacco · Household Products · Personal Products
-  - **Health Care:** Health Care Equipment & Supplies · Health Care Providers & Services · Health Care Technology · Biotechnology · Pharmaceuticals · Life Sciences Tools & Services
-  - **Financials:** Banks · Thrifts & Mortgage Finance · Diversified Financial Services · Consumer Finance · Capital Markets · Mortgage REITs · Insurance
-  - **Information Technology:** IT Services · Software · Communications Equipment · Technology Hardware · Semiconductors · Electronic Equipment & Components
-  - **Communication Services:** Diversified Telecommunication Services · Wireless Telecommunication Services · Entertainment · Interactive Home Entertainment
-  - **Utilities:** Electric Utilities · Gas Utilities · Multi-Utilities · Water Utilities · Independent Power Producers
-  - **Real Estate:** Diversified REITs · Industrial REITs · Hotel & Resort REITs · Office REITs · Health Care REITs · Residential REITs · Retail REITs · Specialized REITs · Real Estate Management & Development
+  **Crypto sectors:**
+  - **Crypto:** Crypto · Diversified Crypto
+
+  **Equity sectors:**
+  - **Communication Services:** Diversified Communication Services · Diversified Telecommunication Services · Wireless Telecommunication Services
+  - **Consumer Discretionary:** Automotive · Diversified Consumer Discretionary · Hotels, Restaurants & Leisure · Household Durables · Interactive Media & Services · Internet & Direct Marketing Retail · Media · Specialty Retail · Textiles, Apparel & Luxury Goods
+  - **Consumer Staples:** Diversified Consumer Staples · Food & Staples
+  - **Diversified:** Conglomerate · Short Fund
+  - **Emerging Markets:** Country Fund · Diversified Emerging Markets
+  - **Financials:** Banks · Capital Markets · Consumer Finance · Diversified Financials · Insurance · Litigation Management
+  - **Health Care:** Biotechnology · Diversified Health Care · Health Care Equipment & Supplies · Health Care Providers & Services · Pharmaceuticals
+  - **Industrials:** Aerospace & Defense · Airlines · Commercial Services & Supplies · Construction & Engineering · Diversified Industrials · Electrical Equipment · Machinery · Marine · Professional Services · Transportation
+  - **Miscellaneous:** Miscellaneous · Tail Risk
+  - **Real Estate:** Diversified Real Estate · Real Estate Management & Development
+  - **Special Situation:** Litigation Claim · Short Fund · Other Special Situation
+  - **Technology:** Diversified Technology · Electronic Equipment & Components · Robotics · Semiconductors · Software
+  - **Utilities:** Diversified Utilities
+
+  **Fixed-Income sectors:**
+  - **Fixed Income:** Fixed Income
+
+  **Miscellaneous sectors:**
+  - **Miscellaneous:** Forecast Contract
+
+  **Macro sectors:**
   - **Macro / Multi-Sector:** Central Bank & Monetary Policy · Fiscal Policy & Government Debt · Currency & FX · Global Trade & Tariffs · Geopolitical Risk · Commodities Complex · Credit Markets · Multi-Asset
-
-  For Fixed-Income: sector = bond type (e.g., Treasuries, High Yield). For Commodity: sector = commodity group. For Crypto: sector = crypto category. For Private: sector = Private Equity · Venture Capital · Private Credit · Real Assets.
 
   ---
 
   ## SYNTHESIS RULES
 
-  1. **One action per unique Type/Sector bucket.** The bucket is the consolidation key — two items with different types or different sectors are in different buckets and must be separate actions. Industry is metadata, not a split dimension; list all relevant industries for the consolidated action in the `industry` field (comma-separated if multiple). Thematic or stylistic similarity (e.g. both being "value" ideas) is not a basis for merging.
-  2. **Macro is exclusive.** If an item qualifies as Macro / Multi-Sector, set type=`Macro`, sector=`Macro / Multi-Sector`, industry=`Multi-Asset` (or the most specific macro sub-category). Do not assign a specific Type/Sector/Industry alongside it. If an item has both a specific equity angle and a macro dimension, choose the classification that best describes the required action. **Macro items default to priority 4** unless there is a hard intraday or 48-hour catalyst (e.g. a central bank decision happening today or tomorrow).
-  3. **Suppress redundant actions** — if an action is substantively covered in the prior actions context and nothing material has changed, skip it. If the same action applies but new context materially changes the picture, include it with the title prefixed "Update: ".
-  4. **Include `record_ids`** — list all record ids that contributed to each action.
-  5. If no records warrant an action, return `{"actions": []}`.
+  1. **One action per unique Type/Sector bucket** (except Special Situation — see rule 2). The bucket is the consolidation key — two items with different types or different sectors are in different buckets and must be separate actions. Industry is metadata, not a split dimension; list all relevant industries for the consolidated action in the `industry` field (comma-separated if multiple). Thematic or stylistic similarity (e.g. both being "value" ideas) is not a basis for merging. Shared Type/Sector is necessary but not sufficient to co-list evidence under one action's thesis: items that fall in the same bucket but do not bear on the thesis are dropped, not appended as extra figures.
+  2. **Special Situation is situation-scoped.** For `sector = Special Situation`, the consolidation key is the
+     **specific situation**, not the Type/Sector bucket. Two Special Situation items may be merged into one action
+     ONLY if they concern the same underlying situation — the same issuer/company, the same litigation or claim,
+     or the same corporate event (merger, spin-off, liquidation, restructuring, tender, rights offering). Unrelated
+     situations that merely share the Special Situation sector — or even the same industry (e.g. two Litigation Claim
+     items involving different defendants) — MUST be emitted as separate actions, one per situation. Never combine
+     them into a single omnibus "Special Situations" write-up, and never use a roundup-style title that spans
+     multiple situations; each action's title must name its one situation. If in doubt about whether two items are
+     the same situation, split them.
+  3. **Macro is exclusive.** If an item qualifies as Macro / Multi-Sector, set type=`Macro`, sector=`Macro / Multi-Sector`, industry=`Multi-Asset` (or the most specific macro sub-category). Do not assign a specific Type/Sector/Industry alongside it. If an item has both a specific equity angle and a macro dimension, choose the classification that best describes the required action. **Macro items default to priority 4** unless there is a hard intraday or 48-hour catalyst (e.g. a central bank decision happening today or tomorrow).
+  4. **Suppress redundant actions** — if an action is substantively covered in the prior actions context and nothing material has changed, skip it. If the same action applies but new context materially changes the picture, include it as an update per the title format below.
+  5. **Include `record_ids`** — list all record ids that contributed to each action.
+  6. If no records warrant an action, return `{"actions": []}`.
+  7. **Evidence discipline.** A single data point cannot confirm two theses that imply opposite positioning. If one observation is cited toward more than one thesis (e.g. both a bullish "buildout" thesis and a bearish "bubble" thesis), state which it most supports and treat the other as unresolved rather than claiming simultaneous validation.
 
   ---
 
@@ -143,8 +174,8 @@ system: |
         "type": "<Type>",
         "sector": "<Sector>",
         "industry": "<Industry or industries covered, comma-separated if multiple>",
-        "action": "<topic title, ≤ 5 words. No action verbs (not 'Assess', 'Research', 'Evaluate', 'Initiate', etc.) — name the subject, not the task. Prefix with 'Update: ' if this updates a prior action with new context.>",
-        "description": "<structured Markdown. Sections in order: (1) one sentence stating the action required and why; (2) **Key Figures** — bulleted list of specific numbers, tickers, dates, prices. Every figure must name its underlying stock/asset — never cite a strike, expiry, or price without the ticker (e.g. '**NVDA** June 18 $135 calls at $1', not 'June 18 $135 calls at $1'); (3) relevant context in 1–3 sentences of prose; (4) **Key Risks** — bulleted list. Bold key figures throughout.>",
+        "action": "<topic title, ≤ 5 words. No action verbs (not 'Assess', 'Research', 'Evaluate', 'Initiate', etc.) — name the subject, not the task. If this updates a prior action with new context, prefix with 'Update: ' AND append ' — <3-6 word clause naming what's new>' so consecutive updates on the same topic are distinguishable at a glance in a task list (e.g. 'Update: FOMC Vol & SPX Bounds — hike-odds mispricing', not a bare repeat of the original title).>",
+        "description": "<structured Markdown. Sections in order, each separated by a blank line (line break) so they render as distinct paragraphs/blocks: (1) 1–2 sentences summarizing the action required and the single falsifiable thesis it rests on, followed immediately (same block, no header, just a line break before it) by 1–3 sentences of relevant supporting context/comparables — these two go together directly below each other, BEFORE Key Figures; (2) **Key Figures** — bulleted list of specific numbers, tickers, dates, prices. Every figure must name its underlying stock/asset — never cite a strike, expiry, or price without the ticker (e.g. '**NVDA** June 18 $135 calls at $1', not 'June 18 $135 calls at $1'). **Relevance gate:** each figure must be causally linked to this action's central thesis — it must change the investment case, not merely appear in the source. Exclude topically adjacent numbers (product benchmarks, unrelated funding rounds, general survey stats) that don't move the thesis. If an action rests on a single material data point, keep Key Figures tightly scoped to that point; do not pad with adjacent items to inflate substance — a thin action should be brief, not bulked; (3) **Key Risks** — bulleted list of **exactly 3** risks that would falsify this action's central thesis or undermine confidence in the evidence supporting it, ranked most important first. Hard cap: never list more than 3, and never pad to reach 3 — if fewer than 3 specific risks exist, list only those. This reader is a sophisticated investor: NEVER include generic, self-evident risks that apply to any position (e.g. 'the stock could decline', 'the market could move against this', 'execution risk') and NEVER include source-quality or corroboration caveats (e.g. 'single-source', 'only one outlet reported this', 'lacks institutional coverage', 'not yet confirmed by other analysts') — these are explicitly banned regardless of how the list is otherwise filled out. Every listed risk must be a specific, thesis-relevant threat (a competing catalyst, a data point that could reverse, an assumption the thesis depends on, a structural or timing risk). Do not merely restate a caveat for each figure; risks are scoped to the thesis, not to individual data points. Bold key figures throughout.>",
         "priority": <1 | 2 | 3 | 4 — see Priority Scale below>,
         "due_string": "<Todoist natural-language due date per Priority Scale>",
         "reminder_minutes": <minutes from now for a push notification, or null. Set to 5 for priority 1 only, null otherwise.>,

@@ -19,6 +19,19 @@ _CST = ZoneInfo("America/Chicago")
 T = TypeVar("T")
 
 
+def _safe_cache_usage(llm: Any) -> tuple[int, int]:
+    """Read (cache_read_tokens, cache_creation_tokens) from llm.consume_cache_usage().
+
+    Tolerates test doubles that don't implement this method (e.g. bare MagicMock)
+    by falling back to (0, 0) instead of raising on unpacking.
+    """
+    try:
+        cache_read, cache_creation = llm.consume_cache_usage()
+        return cache_read or 0, cache_creation or 0
+    except Exception:
+        return 0, 0
+
+
 def setup_logging(log_name: str) -> logging.Logger:
     """Configure root logger to a timestamped file in LOG_DIR plus stderr.
 
@@ -217,6 +230,7 @@ def summarize_content(
     summary_rationale is truncated to 1000 chars; executive_summary, confidence, or
     rationale may be None if the model omits them.
     """
+    llm.reset_usage()
     result = llm.call_json("summarize", user_prompt, system=system_prompt)
     summary = result.get("summary", "")
     executive_summary = result.get("executive_summary") or None
@@ -224,12 +238,18 @@ def summarize_content(
         result.get("summary_confidence"), context, field="summary_confidence"
     )
     summary_rationale = (result.get("summary_rationale") or "")[:1000] or None
+    _, summary_tokens = llm.consume_usage()
+    cache_read, cache_creation = _safe_cache_usage(llm)
     logging.info(
-        "[summarize] %s → summary_confidence=%s len(summary)=%d has_exec_summary=%s",
+        "[summarize] %s → summary_confidence=%s len(summary)=%d has_exec_summary=%s "
+        "tokens=%d cache_read=%d cache_creation=%d",
         context,
         summary_confidence,
         len(summary),
         executive_summary is not None,
+        summary_tokens,
+        cache_read,
+        cache_creation,
     )
     return summary, executive_summary, summary_confidence, summary_rationale
 
@@ -240,12 +260,15 @@ def classify_with_escalation(
     user_prompt: str,
     context: str,
 ) -> tuple[dict, int | None, bool, str | None, int | None]:
-    """Run classify; escalate to the escalation model when confidence is low or label is Miscellaneous.
+    """Run classify; escalate to the escalation model when confidence is low, label is
+    Miscellaneous, or `actionable` may have been missed on genuine trade content.
 
     Reads the classify-step `classification_confidence` field. Escalation triggers
-    when either condition holds (OR):
+    when any condition holds (OR):
     - classification_confidence is not NULL and is at or below CLASSIFY_ESCALATION_THRESHOLD (set to 0 to disable)
     - any assigned label is Miscellaneous (always escalates, regardless of threshold)
+    - label includes Business, `actionable` was withheld, and a high-precision trade-signal
+      tag from config.CLASSIFY_ACTIONABLE_REVIEW_TAGS is present (see config for rationale)
 
     Returns (classify_result, classification_confidence, escalated, classify_model, classify_tokens).
     classify_model is the full model ID of the final call; classify_tokens is the
@@ -258,6 +281,7 @@ def classify_with_escalation(
         result.get("classification_confidence"), context, field="classification_confidence"
     )
     initial_labels = result.get("labels", [])
+    initial_tags = [tag.lower() for tag in result.get("tags", [])]
 
     logging.info(
         "[classify] %s → labels=%s classification_confidence=%s",
@@ -271,13 +295,21 @@ def classify_with_escalation(
 
     escalate_low_conf = threshold > 0 and confidence is not None and confidence <= threshold
     escalate_misc = "miscellaneous" in raw_labels
+    missed_actionable_tags = (
+        set(initial_tags) & config.CLASSIFY_ACTIONABLE_REVIEW_TAGS
+        if "business" in raw_labels and "actionable" not in initial_tags
+        else set()
+    )
+    escalate_missed_actionable = bool(missed_actionable_tags)
 
-    if escalate_low_conf or escalate_misc:
+    if escalate_low_conf or escalate_misc or escalate_missed_actionable:
         reasons = []
         if escalate_low_conf:
             reasons.append(f"low confidence ({confidence} <= {threshold})")
         if escalate_misc:
             reasons.append("Miscellaneous label")
+        if escalate_missed_actionable:
+            reasons.append(f"possible missed actionable (tags={sorted(missed_actionable_tags)})")
         escalation_model = config.CLASSIFY_ESCALATION_MODEL
         logging.info(
             "[escalate] %s → triggering %s re-classify: %s",
@@ -292,8 +324,10 @@ def classify_with_escalation(
             result.get("classification_confidence"), context, field="classification_confidence"
         )
         classify_model, classify_tokens = llm.consume_usage()
+        cache_read, cache_creation = _safe_cache_usage(llm)
         logging.info(
-            "[escalate] %s → done: labels %s → %s  confidence %s → %s  model=%s tokens=%s",
+            "[escalate] %s → done: labels %s → %s  confidence %s → %s  model=%s tokens=%s "
+            "cache_read=%d cache_creation=%d",
             context,
             initial_labels,
             result.get("labels", []),
@@ -301,18 +335,24 @@ def classify_with_escalation(
             new_confidence,
             classify_model,
             classify_tokens,
+            cache_read,
+            cache_creation,
         )
         return result, new_confidence, True, classify_model, classify_tokens or None
 
     classify_model, classify_tokens = llm.consume_usage()
+    cache_read, cache_creation = _safe_cache_usage(llm)
     logging.info(
-        "[classify] %s → no escalation (labels=%s classification_confidence=%s threshold=%s model=%s tokens=%s)",
+        "[classify] %s → no escalation (labels=%s classification_confidence=%s threshold=%s "
+        "model=%s tokens=%s cache_read=%d cache_creation=%d)",
         context,
         initial_labels,
         confidence,
         threshold,
         classify_model,
         classify_tokens,
+        cache_read,
+        cache_creation,
     )
     return result, confidence, False, classify_model, classify_tokens or None
 

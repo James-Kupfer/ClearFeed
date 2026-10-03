@@ -689,3 +689,167 @@ def test_run_dispatch_marks_llm_call_non_cacheable(tmp_path):
     mock_send.assert_called_once()
     call_kwargs = mock_llm.call.call_args[1]
     assert call_kwargs.get("cacheable") is False
+
+
+# ---------------------------------------------------------------------------
+# Further Information completeness
+# ---------------------------------------------------------------------------
+
+def _fi_entry(n: int, slug: str = "misc") -> str:
+    return (
+        f'<div id="fi-{slug}-{n}"><h3>Entry {n}</h3><p>Body.</p>'
+        f'<p><a href="#{slug}-{n}">↑ Back</a></p></div>'
+    )
+
+
+def _items(count: int, slug: str = "misc") -> str:
+    return "\n".join(
+        f'<div class="item" id="{slug}-{n}"><p><strong>Item {n}.</strong> Text. '
+        f'<a href="#fi-{slug}-{n}">→ Further detail</a></p></div>'
+        for n in range(1, count + 1)
+    )
+
+
+def _complete(html, llm):
+    from dispatch import _complete_further_information
+
+    return _complete_further_information(
+        html, llm=llm, operation="digest", system_prompt="sys",
+        user_prompt="records", model_override=None,
+    )
+
+
+def test_complete_fi_noop_when_all_entries_present():
+    llm = MagicMock()
+    html = _items(2) + "\n<h2>Further Information</h2>" + _fi_entry(1) + _fi_entry(2)
+    assert _complete(html, llm) == html
+    llm.call.assert_not_called()
+
+
+def test_complete_fi_drops_truncated_entry_and_regenerates_missing():
+    llm = MagicMock()
+    llm.call.return_value = "```html\n" + _fi_entry(2) + _fi_entry(3) + "\n```"
+    truncated = (
+        _items(3) + "\n<h2>Further Information</h2>" + _fi_entry(1)
+        + '<div id="fi-misc-2"><h3>Entry 2</h3><p>cut off mid-sent'
+    )
+    out = _complete(truncated, llm)
+
+    from dispatch import _missing_fi_ids
+
+    assert _missing_fi_ids(out) == []
+    assert "cut off mid-sent" not in out
+    assert out.count('id="fi-misc-2"') == 1
+    assert "fi-misc-2, fi-misc-3" in llm.call.call_args.args[1]
+    assert out.count("<h2>Further Information</h2>") == 1
+
+
+def test_complete_fi_adds_header_when_truncated_before_fi_section():
+    llm = MagicMock()
+    llm.call.return_value = _fi_entry(1) + _fi_entry(2)
+    out = _complete(_items(2), llm)
+    assert "<h2>Further Information</h2>" in out
+    assert out.index("<h2>Further Information</h2>") < out.index('id="fi-misc-1"')
+
+
+def test_complete_fi_removes_dead_links_after_repeated_failure():
+    llm = MagicMock()
+    llm.call.return_value = ""  # model never produces the missing entries
+    out = _complete(_items(2) + _fi_entry(1), llm)
+
+    assert llm.call.call_count == 3
+    assert 'href="#fi-misc-2"' not in out
+    assert 'href="#fi-misc-1"' in out
+    assert "Item 2." in out  # the item itself survives
+
+
+# ---------------------------------------------------------------------------
+# Digest profiles: cross-digest topic ownership
+# ---------------------------------------------------------------------------
+
+_PROFILES_DIR = os.path.join(os.path.dirname(__file__), "..", "profiles")
+_OWNERSHIP_DIGESTS = ("technology", "science", "miscellaneous")
+
+
+def _load_digest(name: str) -> dict:
+    import yaml
+
+    with open(
+        os.path.join(_PROFILES_DIR, f"digest_{name}.yaml"), encoding="utf-8"
+    ) as fh:
+        return yaml.safe_load(fh)
+
+
+def _ownership_block(prompt: str) -> str:
+    start = prompt.index("## TOPIC OWNERSHIP")
+    return prompt[start : prompt.index("---", start)]
+
+
+def _misc_label_set() -> set[str]:
+    import re
+
+    sql = _load_digest("miscellaneous")["inputs"][0]["sql"]
+    match = re.search(r"rt\.kind = 'label' AND rt\.value IN \(([^)]*)\)", sql)
+    return set(re.findall(r"'([^']+)'", match.group(1)))
+
+
+def test_topic_ownership_block_identical_across_digests():
+    """The ownership map must not drift between the digests that share it."""
+    blocks = {
+        n: _ownership_block(_load_digest(n)["prompt"]) for n in _OWNERSHIP_DIGESTS
+    }
+    assert len(set(blocks.values())) == 1, blocks
+
+
+def test_technology_routing_covers_miscellaneous_labels():
+    """Every label feeding the Miscellaneous digest must be routed to Technology on AI tags,
+    otherwise Miscellaneous drops an AI facet that Technology never receives."""
+    sql = _load_digest("technology")["inputs"][0]["sql"]
+    for label in _misc_label_set():
+        assert f"'{label}'" in sql, label
+
+
+def test_ownership_block_missing_raises():
+    """A prompt without the ownership heading fails loudly rather than comparing empty text."""
+    with pytest.raises(ValueError):
+        _ownership_block("## INPUT FORMAT\n---\n")
+
+
+# ---------------------------------------------------------------------------
+# Tag line styling
+# ---------------------------------------------------------------------------
+
+
+def test_style_tag_lines_applies_size_and_color():
+    import config
+    from dispatch import _style_tag_lines
+
+    out = _style_tag_lines("<p><em>Tags:</em> llm, benchmark</p>")
+    assert out == (
+        f'<p style="font-size:{config.DIGEST_TAG_FONT_PT}pt;'
+        f'color:{config.DIGEST_TAG_COLOR};"><em>Tags:</em> llm, benchmark</p>'
+    )
+
+
+def test_style_tag_lines_replaces_existing_attributes_and_ignores_other_paragraphs():
+    from dispatch import _style_tag_lines
+
+    html = '<p>Body text</p>\n<p class="x"> <EM>Tags:</EM> genetics</p>'
+    out = _style_tag_lines(html)
+    assert out.startswith("<p>Body text</p>")
+    assert 'class="x"' not in out
+    assert out.count("font-size:") == 1
+
+
+def test_style_tag_lines_leaves_html_without_tags_unchanged():
+    from dispatch import _style_tag_lines
+
+    html = "<p><em>Note:</em> nothing here</p>"
+    assert _style_tag_lines(html) == html
+
+
+def test_wrap_html_styles_tag_lines():
+    from dispatch import _wrap_html
+
+    out = _wrap_html("<p><em>Tags:</em> llm</p>", "T", "P", 1)
+    assert 'style="font-size:' in out

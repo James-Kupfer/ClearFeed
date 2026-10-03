@@ -37,12 +37,14 @@ try {
     $intervalMinutes = 15
     try {
         $env:PYTHONPATH = "$root\src;$root;$env:PYTHONPATH"
-        $intervalRaw = & python -c "import config; print(config.INGEST_POLL_INTERVAL_MINUTES)"
+        $intervalRaw = & python -c "import config; print(config.INGEST_POLL_INTERVAL_MINUTES)" 2>&1
         if ($LASTEXITCODE -eq 0 -and $intervalRaw -match '^\d+$') {
             $intervalMinutes = [int]$intervalRaw
+        } else {
+            Write-WatchLog "WARNING config interval read failed (exit=$LASTEXITCODE output=[$intervalRaw]) -- using default ${intervalMinutes}m"
         }
     } catch {
-        # keep default
+        Write-WatchLog "WARNING config interval read threw: $($_.Exception.Message) -- using default ${intervalMinutes}m"
     }
     $staleThresholdMinutes = $intervalMinutes * 3
 

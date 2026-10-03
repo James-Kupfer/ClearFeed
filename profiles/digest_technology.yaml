@@ -1,6 +1,6 @@
 kind: digest
 name: digest_technology
-model: haiku
+model: sonnet
 recipient: digests@kupfer.me
 subject_template: 'Technology Digest - {period_end_date}'
 dedup_schedule: weekly_saturday
@@ -18,8 +18,40 @@ inputs:
     FROM ContentRecords cr
     WHERE cr.enrichment_status = 'complete'
       AND cr.received_at >= (now() AT TIME ZONE 'America/Chicago') - interval '240 hours'
-      AND EXISTS (SELECT 1 FROM RecordTerms rt WHERE rt.id = cr.id
-                  AND rt.kind = 'label' AND rt.value IN ('Technology'))
+      AND (
+        EXISTS (SELECT 1 FROM RecordTerms rt WHERE rt.id = cr.id
+                AND rt.kind = 'label' AND rt.value IN ('Technology'))
+        -- Tag routing: AI safety/governance facets of records labelled for the
+        -- Science or Miscellaneous digests. See TOPIC OWNERSHIP in the prompt.
+        OR (EXISTS (SELECT 1 FROM RecordTerms rt WHERE rt.id = cr.id
+                    AND rt.kind = 'label'
+                    AND rt.value IN ('Science', 'Miscellaneous', 'Politics', 'Culture', 'Health'))
+            AND EXISTS (SELECT 1 FROM RecordTerms rt WHERE rt.id = cr.id
+                        AND rt.kind = 'tag'
+                        AND rt.value IN ('ai_safety', 'ai_security', 'ai_regulation',
+                                         'ai_governance', 'alignment')))
+      )
+      -- Vulnerability, patching, and attack-technique content is always out of scope.
+      AND NOT EXISTS (SELECT 1 FROM RecordTerms rt WHERE rt.id = cr.id
+                  AND rt.kind = 'tag' AND rt.value IN (
+                    'sandbox_escape', 'rce', 'zero_day', 'steganography', 'sql_injection', 'mfa_bypass',
+                    'device_code_phishing', 'credential_stuffing', 'ransomware_staging',
+                    'prompt_injection', 'privilege_escalation', 'supply_chain_attack',
+                    'windows_forensics', 'threat_actor', 'cve',
+                    'cryptominer', 'xmrig', 'lazarus_group', 'botnet', 'honeypot',
+                    'social_engineering', 'identity_threat',
+                    'vulnerability', 'malware'
+                  ))
+      -- General and AI-adjacent security content is out of scope unless it is an AI security story.
+      AND NOT (
+        EXISTS (SELECT 1 FROM RecordTerms rt WHERE rt.id = cr.id
+                AND rt.kind = 'tag' AND rt.value IN (
+                  'cybersecurity', 'jailbreaking', 'ai_enabled_attacks', 'shadow_ai'))
+        AND NOT EXISTS (SELECT 1 FROM RecordTerms rt WHERE rt.id = cr.id
+                        AND rt.kind = 'tag'
+                        AND rt.value IN ('ai_security', 'ai_safety', 'ai_regulation',
+                                         'ai_governance', 'alignment'))
+      )
     ORDER BY cr.received_at DESC LIMIT 200
 - section: Prior Digests
   source: digests
@@ -33,6 +65,18 @@ prompt: |
 
   ---
 
+  ## TOPIC OWNERSHIP
+
+  The Technology, Science, and Miscellaneous digests share one ownership map so a topic is reported in exactly one of them. A record can reach more than one of these digests, by label or by tag routing; report only the facets this digest owns and drop the rest, even when the source leads with them.
+
+  - **Technology** owns AI systems and the AI industry: models, labs, products, capability claims, benchmarks, AI safety and alignment, AI governance, regulation, and policy (including government, UN, and international action on AI), and AI security (breaches, misuse, and attacks by or against AI systems or labs). Vulnerability disclosures, CVEs, and patch advisories are out of scope for every digest, even when they involve an AI product.
+  - **Science** owns scientific findings, including findings produced by AI systems: what was discovered, the evidence for it, and expert assessment of it.
+  - **Miscellaneous** owns politics, geopolitics, culture, and ideas where AI is absent or incidental.
+
+  Boundary test for AI and science: if the subject is a specific finding about the natural world or mathematics, Science owns it, even when an AI system produced it. If the subject is what AI systems can do in general, how labs behave, or how AI is governed, Technology owns it.
+
+  ---
+
   ## INPUT FORMAT
 
   Records contain: **summary**, **tags**, **source**, **url**, and **emphasis_tags** (high-signal hints — weight these in prioritization). A **PRIOR DIGESTS** band of previously published summaries may also be supplied for de-duplication.
@@ -41,12 +85,24 @@ prompt: |
 
   ## GLOBAL SYNTHESIS RULES
 
-  1. **Consolidate.** The same or closely related story from multiple sources becomes one item; list contributing sources separately in its Further Information entry.
-  2. **Reward corroboration.** Items confirmed by multiple *independent* sources rank above single-source items or the same author repeated.
-  3. **Short-writeup → detail.** Each item is a concise writeup linking to an expanded Further Information entry.
-  4. **No repeats.** Do not re-report an item covered in a prior digest unless there is a significant update or change. When you do, prefix the headline with "Update:" and begin the item body with **Update Summary:** — ≤ 50 words (one sentence or short bullets) of only what materially changed.
-  5. **Split multi-topic records.** Break any record spanning disparate areas into separate items routed to the appropriate categories.
-  6. **Cap at 25.** Report the 25 most significant items; drop the remainder.
+  1. **Consolidate by development, not by article.** Records belong in one item when they concern the *same technical development or the same underlying capability shift*, even when they come from different outlets, on different dates, with different framing or different detail. Do not require that they describe the same release, cite the same benchmarks, or reach the same conclusion — competing assessments of one development belong in the same item, presented as disagreement. The test is: **would a reader consider these one topic?** If yes, merge; list contributing sources separately in the Further Information entry.
+     - Merge (same development/shift): several labs shipping long-context updates in one window, plus a benchmark analysis of them and a piece on the pricing response — one item on the long-context frontier moving, not four. Likewise, a model release and a how-to guide for using that same model are one item.
+     - Do not merge (distinct developments): a frontier-model release and an unrelated developer-tooling launch, even if both are described as agentic.
+  2. **One record, one item.** Each source record contributes to exactly one item. If a record's substance would appear in two items, that is duplication by definition — merge them, or keep the stronger and drop the weaker. Building an inventory of which records feed which item, and confirming no record appears twice, is part of producing the digest.
+  3. **One observation, one item.** A given fact — a benchmark score, a context-window figure, a price point, a version number — is *headlined* in exactly one item. It may recur inside another item as supporting context only if that item's development is genuinely independent. If two items lead with the same observation, they are one item.
+  4. **Merge pass before output — mandatory.** After drafting items and before emitting, re-read the full draft set and merge any pair that fails *any* of these tests:
+     - **Pointer test.** One item cites, defers to, or corroborates another ("see item N," "as in item N," "corroborated by item N," "part of the shift described above").
+     - **Restatement test.** One item restates the other's substance in different words *without* pointing at it — e.g. an item on the long-context frontier moving and a separate item reporting the individual benchmark numbers that establish it, drawn from the same coverage. This is the harder case and the one to look for: no cross-reference appears, yet both items rest on the same records and the same observations.
+     - **Source test.** The two items share a contributing record (rule 2) or lead with the same observation (rule 3).
+     A cross-reference is never the fix; merging is. The only permitted reference to prior coverage is to a *prior digest*, via the "Update:" mechanism in rule 7.
+  5. **Reward corroboration.** Items confirmed by multiple *independent* sources rank above single-source items or the same author repeated. Corroboration is expressed *inside* one item by listing multiple sources, never by emitting a second item that agrees with the first.
+  6. **Short-writeup → detail.** Each item is a concise writeup linking to an expanded Further Information entry.
+  7. **No repeats.** Do not re-report an item covered in a prior digest unless there is a significant update or change. When you do, prefix the headline with "Update:" and begin the item body with **Update Summary:** — ≤ 50 words (one sentence or short bullets) of only what materially changed.
+  8. **Split only along in-scope dimensions, and only when the parts are separate developments.** Break a multi-topic record into separate items only where the resulting items are all in scope for this digest *and* each concerns a distinct development. Facets of one development (the release, its benchmark results, its tooling implications) stay in a single item. Out-of-scope facets are dropped, not promoted into their own item. Never create an item whose subject falls outside this digest's scope, even if the source pairs it with in-scope material.
+  9. **Categories classify items; they never fragment them.** The `<h2>` category headers are applied *after* consolidation. A consolidated item touching several categories is filed under its dominant one and reported once; never split one development into per-category items (e.g. a model release under Frontier Models plus its own Developer Tooling item) to populate the category set. Sections are populated only by items that survived the merge pass — empty sections are omitted silently, and no item is ever authored to fill one.
+  10. **A development and its evidence are one item — never two.** When a capability shift is *evidenced by* specific results (the frontier moving and the benchmark scores that show it; a release and its pricing response), report it once with the evidence carried inside. A separate item is warranted only when the results stand on a development no other item in this digest already covers.
+  11. **Scope is enforced per-facet, not per-record.** A record enters by label, but you report only its in-scope facets. If an in-scope record also carries an out-of-scope angle (market or investment implications, deal mechanics, clinical advice, etc.), report the in-scope facet and omit the rest. Do not reproduce an out-of-scope angle because the source led with it.
+  12. **Cap at 25.** Report the 25 most significant items; drop the remainder. The cap is a ceiling, not a target — a well-consolidated digest of 8 items is better than a fragmented one of 25.
 
   ---
 
@@ -56,30 +112,33 @@ prompt: |
 
   **Scope:** important news *and* educational content — how-to guides, implementation and deployment activity.
 
-  Group items under `<h2>` category headers **derived from the tags** (consolidation across related tags is acceptable). Let the tags drive the actual category set; common ones: Frontier Models, Developer Tooling, Education & How-To, Policy & Regulation, Industry & Funding.
+  Group items under `<h2>` category headers **derived from the tags** (consolidation across related tags is acceptable). Let the tags drive the actual category set; common ones: Frontier Models, Developer Tooling, Education & How-To, Policy & Regulation, Industry & Funding. Under Industry & Funding, treat funding as a signal of technical direction, not deal mechanics — M&A terms, antitrust, and valuations belong to the Business digest, not here.
 
   Each item (Format A):
   ```html
   <div class="item" id="aitech-{n}">
-    <p><strong>{Headline.}</strong> {2–4 sentence summary with specifics; <=30 words.} <a href="#fi-aitech-{n}">→ Further detail</a></p>
+    <p><strong>{Headline; <=15 words, one clause naming the item's unifying theme — even when the item consolidates several sub-facts, the headline names what ties them together rather than listing the sub-facts themselves (via serial lists, colons, or semicolons); push the sub-facts into the summary sentence instead.}</strong> {2–4 sentence summary with specifics; <=30 words.} <a href="#fi-aitech-{n}">→ Further detail</a></p>
   </div>
   ```
 
   Then render Further Information once, after all categories:
   ```html
-  <hr style="border: none; border-top: 4px solid #333; margin: 32px 0;">
+  <hr style="border: none; border-top: 8px double #333; margin: 32px 0;">
   <h2>Further Information</h2>
   <div id="fi-aitech-{n}">
     <h3>{Specific headline — one declarative sentence}</h3>
-<<<<<<< Updated upstream
-    <p>{Expanded synthesis ≤ 600 words. State what the sources collectively establish; note any disagreement. Prose only.}</p>
-=======
     <p>{Opening paragraph: what the sources collectively establish within this digest's scope, and the through-line. Do not expand into adjacent domains the source touches. Note any disagreement.}</p>
     <ul>
       <li><strong>{Subject — e.g. Model/Product Name, lab, or the facet: benchmarks, pricing, tooling}:</strong> {its specifics — figures, versions, dates.}</li>
       <li><strong>{Next subject}:</strong> {its specifics.}</li>
     </ul>
->>>>>>> Stashed changes
+=======
+    <p>{Opening paragraph: what the sources collectively establish within this digest's scope, and the through-line. Do not expand into adjacent domains the source touches. Note any disagreement.}</p>
+    <ul>
+      <li><em>{Subject — e.g. Model/Product Name, lab, or the facet: benchmarks, pricing, tooling}:</em> {its specifics — figures, versions, dates.}</li>
+      <li><em>{Next subject}:</em> {its specifics.}</li>
+    </ul>
+>>>>>>> 279d241244594a1d389c5d90946be7f9a6986925
     <p>Sources: <a href="{url_1}" target="_blank">{source 1}</a> – {MM/DD/YYYY}; <a href="{url_2}" target="_blank">{source 2}</a> – {MM/DD/YYYY}</p>
     <p><em>Tags:</em> {comma-separated list of this item's tags}</p>
     <p><a href="#aitech-{n}">↑ Back</a><br></p>
@@ -87,16 +146,17 @@ prompt: |
   ```
   List one source for single-source items; each contributing source for consolidated items.
 
-<<<<<<< Updated upstream
-=======
-  **Bulleted subjects — required.** The body is ≤ 1000 words total across all paragraphs. **Never cover multiple subjects inside one `<li>`.** Give every distinct subject its own `<li>` inside a single `<ul>`, opened with that subject in `<strong>` followed by a colon:
+  **Bulleted subjects — required.** The body is <= 1000 words total across all paragraphs. **Never cover multiple subjects inside one `<li>`.** Give every distinct subject its own `<li>` inside a single `<ul>`, opened with that subject in `<strong>` followed by a colon:
   - a named model, product, lab, or vendor → one `<li>` each, led by `<strong>Model/Product Name:</strong>`
   - a distinct facet of a consolidated item (the release itself, benchmark results, pricing response, tooling implications) → one `<li>` each, led by its name in `<strong>`
   - a single-subject item needs no split — one or two plain paragraphs are correct, and the bulleted lead-in is unnecessary
 
   Prose *within* each bullet — full sentences. The requirement is a bullet break *between* subjects, not further list nesting. A run-on paragraph covering three model releases is a defect; three bullets, one per release, is correct.
 
+<<<<<<< HEAD
 >>>>>>> Stashed changes
+=======
+>>>>>>> 279d241244594a1d389c5d90946be7f9a6986925
   If nothing qualifies: `<p><em>Nothing to report.</em></p>`
 
   ---
@@ -105,11 +165,9 @@ prompt: |
 
   - Professional, direct; no filler ("it's important to note", "in conclusion").
   - Prefer specific numbers, names, dates over vague characterization.
-<<<<<<< Updated upstream
-  - `<strong>` for headlines and key entities; `<em>` for attributions.
 =======
-  - `<strong>` for headlines, key entities, and Further Information subject/facet bullet lead-ins; `<em>` for attributions.
->>>>>>> Stashed changes
+  - `<strong>` for headlines and key entities; `<em>` for attributions and for Further Information subject/facet bullet lead-ins.
+>>>>>>> 279d241244594a1d389c5d90946be7f9a6986925
   - Order within each category by importance, weighting cross-source corroboration.
   - End each Further Information entry with a **Tags** line: `<em>Tags:</em>` followed by the item's tags (union of contributing records' `tags`, deduplicated, lowercase, comma-separated).
 
@@ -128,7 +186,7 @@ prompt: |
     <p><strong>Practical guide to local RAG with ChromaDB and Ollama.</strong> Step-by-step privacy-preserving document indexing on local hardware, covering chunking strategy and embedding-model trade-offs. <a href="#fi-aitech-2">→ Further detail</a></p>
   </div>
 
-  <hr style="border: none; border-top: 4px solid #333; margin: 32px 0;">
+  <hr style="border: none; border-top: 8px double #333; margin: 32px 0;">
   <h2>Further Information</h2>
   <div id="fi-aitech-1">
     <h3>Competing long-context releases compress the frontier-model field within a single week</h3>

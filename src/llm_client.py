@@ -48,6 +48,8 @@ class AnthropicBackend:
         )
         self.last_input_tokens: int = 0
         self.last_output_tokens: int = 0
+        self.last_cache_read_tokens: int = 0
+        self.last_cache_creation_tokens: int = 0
         self.last_model_id: str = ""
 
     @retry(
@@ -74,8 +76,6 @@ class AnthropicBackend:
         schedule cycle), where cache_control would only add the ~1.25x write premium
         with no read to offset it.
         """
-<<<<<<< Updated upstream
-=======
         system_param = (
             [
                 {
@@ -87,24 +87,62 @@ class AnthropicBackend:
             if system
             else []
         )
->>>>>>> Stashed changes
+=======
+        # Static system prompts (summarize/classify/digest) are byte-identical across
+        # many calls — mark the block cacheable so repeat calls within the 5-minute
+        # TTL read at 10% of input cost instead of paying full price each time.
+        system_param = (
+            [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
+            if system
+            else []
+        )
+>>>>>>> 279d241244594a1d389c5d90946be7f9a6986925
         with self._client.messages.stream(
             model=model_id,
             max_tokens=max_tokens,
-            system=system,
+            system=system_param,
             messages=[{"role": "user", "content": prompt}],
         ) as stream:
             message = stream.get_final_message()
         self.last_input_tokens = message.usage.input_tokens
         self.last_output_tokens = message.usage.output_tokens
+        self.last_cache_read_tokens = getattr(message.usage, "cache_read_input_tokens", 0) or 0
+        self.last_cache_creation_tokens = (
+            getattr(message.usage, "cache_creation_input_tokens", 0) or 0
+        )
         self.last_model_id = model_id
+        log.debug(
+            "LLM usage: model=%s input=%d output=%d cache_read=%d cache_creation=%d",
+            model_id,
+            self.last_input_tokens,
+            self.last_output_tokens,
+            self.last_cache_read_tokens,
+            self.last_cache_creation_tokens,
+        )
         if message.stop_reason == "max_tokens":
             log.warning(
                 "LLM output hit max_tokens=%d for model=%s — response was truncated",
                 max_tokens,
                 model_id,
             )
-        return message.content[0].text
+        # content[0] is not reliably the text block — some models (e.g. extended-thinking
+        # responses) prepend a ThinkingBlock, which has no .text attribute. Find the first
+        # actual text block instead of assuming position.
+        for block in message.content:
+            if getattr(block, "type", None) == "text":
+                return block.text
+        if message.stop_reason == "refusal":
+            raise ValueError(
+                f"Model refused to respond for model={model_id} — content was likely "
+                f"flagged by the model's own safety classifier (e.g. a digest batch "
+                f"dense with exploit/malware-themed items). Not a token-budget issue; "
+                f"retrying with more max_tokens will not help."
+            )
+        raise ValueError(
+            f"No text block in response content for model={model_id} "
+            f"(block types: {[getattr(b, 'type', None) for b in message.content]}, "
+            f"stop_reason={message.stop_reason!r})"
+        )
 
 
 # Registry: alias -> Backend class. Add OllamaBackend here in v2.
@@ -135,12 +173,16 @@ class LLMClient:
         self._max_tokens = max_tokens
         self._accum_input: int = 0
         self._accum_output: int = 0
+        self._accum_cache_read: int = 0
+        self._accum_cache_creation: int = 0
         self._last_model_id: str = ""
 
     def reset_usage(self) -> None:
         """Reset accumulated token counters. Call before a classify chain."""
         self._accum_input = 0
         self._accum_output = 0
+        self._accum_cache_read = 0
+        self._accum_cache_creation = 0
         self._last_model_id = ""
 
     def consume_usage(self) -> tuple[str | None, int]:
@@ -152,9 +194,19 @@ class LLMClient:
         if hasattr(self._backend, "last_model_id"):
             self._accum_input += getattr(self._backend, "last_input_tokens", 0)
             self._accum_output += getattr(self._backend, "last_output_tokens", 0)
+            self._accum_cache_read += getattr(self._backend, "last_cache_read_tokens", 0)
+            self._accum_cache_creation += getattr(self._backend, "last_cache_creation_tokens", 0)
             self._last_model_id = getattr(self._backend, "last_model_id", "") or self._last_model_id
         total = self._accum_input + self._accum_output
         return self._last_model_id or None, total
+
+    def consume_cache_usage(self) -> tuple[int, int]:
+        """Return (cache_read_tokens, cache_creation_tokens) accumulated since last reset_usage().
+
+        Call after consume_usage() in the same accounting window — both read from
+        the same accumulators, populated by consume_usage()'s backend read.
+        """
+        return self._accum_cache_read, self._accum_cache_creation
 
     def call(
         self,
@@ -171,7 +223,7 @@ class LLMClient:
             operation: key into LLM_ROUTING (e.g. "classify", "digest").
             prompt: user-turn content.
             system: optional system prompt.
-            model_override: alias ("haiku"/"sonnet") or full model ID; bypasses routing.
+            model_override: alias ("haiku"/"sonnet"/"opus") or full model ID; bypasses routing.
             max_tokens: overrides instance default.
             cacheable: whether to mark `system` with cache_control (see
                 AnthropicBackend.call). Default True; pass False for calls known to
@@ -231,7 +283,9 @@ class LLMClient:
                     f"valid JSON — no surrounding text or markdown fences. Every "
                     f'double-quote character inside a string value must be escaped '
                     f'as \\", and every literal newline inside a string value must '
-                    f'be escaped as \\n.'
+                    f'be escaped as \\n. Backslash is ONLY valid before ", \\, /, b, '
+                    f'f, n, r, t, or u — do NOT put a backslash before any other '
+                    f'character (e.g. a dollar sign: write $400, never \\$400).'
                 )
         raise last_exc
 

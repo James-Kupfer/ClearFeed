@@ -337,6 +337,7 @@ All tunables in [`src/config.py`](src/config.py):
 | Setting | Purpose |
 |---------|---------|
 | `LLM_ROUTING` | Model per operation (`summarize`/`classify`/`digest`/`synthesis`/`action`) |
+| `DIGEST_TAG_FONT_PT`, `DIGEST_TAG_COLOR` | Size (pt) and CSS color of each digest item's "Tags:" line, in email and PDF |
 | `LLM_MAX_TOKENS` / `DIGEST_MAX_TOKENS` | Output token caps |
 | `INGEST_POLL_INTERVAL_MINUTES` | Orchestrator loop interval |
 | `EMAIL_INGEST_LOOKBACK_DAYS` | Inbox lookback window |

@@ -101,8 +101,6 @@ Good: "Actionable withheld: item is market commentary, no directed action. Tags 
 Poor: "It's a tech newsletter so it's Technology."
 </rationale>
 
-<<<<<<< Updated upstream
-=======
 <worked_examples>
 Six end-to-end examples anchoring the boundary rules above. Each shows the reasoning and the exact JSON that should follow.
 
@@ -240,6 +238,7 @@ Reasoning: the bulk of the piece is analytical (a structural argument about cust
 }
 ```
 
+<<<<<<< HEAD
 Example 7 — Spam vs. Business, a paid-newsletter subscription CTA does not override dominant substantive analysis.
 Reasoning: the email covers four distinct named-ticker situations, each with a specific thesis, valuation figure, or price target and (for one) a dated catalyst — this is the dominant content by volume and specificity. A "upgrade to our paid tier" CTA appears, but it is a minor appended pitch, not what the email is for — applying the Spam dominance test, the analysis content overwhelms the pitch, so Spam does not apply; keep the topical label and tag the CTA as subscription_pitch. Two of the four situations carry a named ticker plus a price target or valuation entry, meeting the actionable trigger.
 ```json
@@ -266,6 +265,10 @@ Reasoning: the email covers four distinct named-ticker situations, each with a s
 </worked_examples>
 
 >>>>>>> Stashed changes
+=======
+</worked_examples>
+
+>>>>>>> 279d241244594a1d389c5d90946be7f9a6986925
 <tag_registry>
 
 ### Handling
@@ -302,6 +305,6 @@ agriculture_science, astronomy, biology, breakthrough, chemistry, climate, ecolo
 advertisement, affiliate_link, cold_outreach, discount_code, marketing, paid_promotion, promotion, sales_offer, sponsored_content, subscription_pitch, unsubscribe
 
 ### Technology
-agents, ai_capex, ai_chips, ai_funding, ai_product, ai_regulation, ai_research, ai_safety, alignment, api, automation, autonomous_vehicles, benchmark, big_tech, cloud, consumer_electronics, cybersecurity, database, data_center, data_privacy, devtools, fine_tuning, funding_round, hardware, inference, infrastructure, llm, mobile, model_release, multimodal, networking, open_source, open_source_ai, product_launch, quantum_computing, rag, robotics, saas, semiconductor, software, startup, training_compute
+agents, ai_capex, ai_chips, ai_funding, ai_governance, ai_product, ai_regulation, ai_research, ai_safety, ai_security, alignment, api, automation, autonomous_vehicles, benchmark, big_tech, cloud, consumer_electronics, cybersecurity, database, data_center, data_privacy, devtools, fine_tuning, funding_round, hardware, inference, infrastructure, llm, mobile, model_release, multimodal, networking, open_source, open_source_ai, product_launch, quantum_computing, rag, robotics, saas, semiconductor, software, startup, training_compute
 
 </tag_registry>

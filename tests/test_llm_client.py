@@ -90,8 +90,6 @@ def test_call_returns_text_when_only_block_is_text():
     result = backend.call("claude-haiku-4-5-20251001", "system", "user", 16000)
 
     assert result == '{"ok": true}'
-
-
 # ---------------------------------------------------------------------------
 # cacheable flag — controls whether the system block gets cache_control
 # ---------------------------------------------------------------------------
