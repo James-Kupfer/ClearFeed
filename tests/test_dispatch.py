@@ -654,3 +654,13 @@ def test_complete_fi_removes_dead_links_after_repeated_failure():
     assert 'href="#fi-misc-2"' not in out
     assert 'href="#fi-misc-1"' in out
     assert "Item 2." in out  # the item itself survives
+
+
+def test_style_tags_lines_sets_8pt_on_tags_paragraphs_only():
+    from dispatch import _style_tags_lines
+
+    html = "<p>Body.</p><p><em>Tags:</em> a, b</p><p> <em>Tags:</em> c</p>"
+    out = _style_tags_lines(html)
+    assert out.count('<p style="font-size: 8pt;">') == 2
+    assert out.startswith("<p>Body.</p>")
+    assert _style_tags_lines(out) == out  # idempotent
