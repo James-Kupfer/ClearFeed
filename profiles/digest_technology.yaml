@@ -1,6 +1,6 @@
 kind: digest
 name: digest_technology
-model: sonnet
+model: sonnet-5.5
 recipient: digests@kupfer.me
 subject_template: 'Technology Digest - {period_end_date}'
 dedup_schedule: weekly_saturday

@@ -87,16 +87,6 @@ class AnthropicBackend:
             if system
             else []
         )
-=======
-        # Static system prompts (summarize/classify/digest) are byte-identical across
-        # many calls — mark the block cacheable so repeat calls within the 5-minute
-        # TTL read at 10% of input cost instead of paying full price each time.
-        system_param = (
-            [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
-            if system
-            else []
-        )
->>>>>>> 279d241244594a1d389c5d90946be7f9a6986925
         with self._client.messages.stream(
             model=model_id,
             max_tokens=max_tokens,
