@@ -582,3 +582,75 @@ def test_query_sql_with_columns_returns_col_names_and_rows():
     assert col_names == ["id", "sender"]
     assert rows[0]["sender"] == "x@y.com"
 
+
+
+# ---------------------------------------------------------------------------
+# Further Information completeness
+# ---------------------------------------------------------------------------
+
+def _fi_entry(n: int, slug: str = "misc") -> str:
+    return (
+        f'<div id="fi-{slug}-{n}"><h3>Entry {n}</h3><p>Body.</p>'
+        f'<p><a href="#{slug}-{n}">↑ Back</a></p></div>'
+    )
+
+
+def _items(count: int, slug: str = "misc") -> str:
+    return "\n".join(
+        f'<div class="item" id="{slug}-{n}"><p><strong>Item {n}.</strong> Text. '
+        f'<a href="#fi-{slug}-{n}">→ Further detail</a></p></div>'
+        for n in range(1, count + 1)
+    )
+
+
+def _complete(html, llm):
+    from dispatch import _complete_further_information
+
+    return _complete_further_information(
+        html, llm=llm, operation="digest", system_prompt="sys",
+        user_prompt="records", model_override=None,
+    )
+
+
+def test_complete_fi_noop_when_all_entries_present():
+    llm = MagicMock()
+    html = _items(2) + "\n<h2>Further Information</h2>" + _fi_entry(1) + _fi_entry(2)
+    assert _complete(html, llm) == html
+    llm.call.assert_not_called()
+
+
+def test_complete_fi_drops_truncated_entry_and_regenerates_missing():
+    llm = MagicMock()
+    llm.call.return_value = "```html\n" + _fi_entry(2) + _fi_entry(3) + "\n```"
+    truncated = (
+        _items(3) + "\n<h2>Further Information</h2>" + _fi_entry(1)
+        + '<div id="fi-misc-2"><h3>Entry 2</h3><p>cut off mid-sent'
+    )
+    out = _complete(truncated, llm)
+
+    from dispatch import _missing_fi_ids
+
+    assert _missing_fi_ids(out) == []
+    assert "cut off mid-sent" not in out
+    assert out.count('id="fi-misc-2"') == 1
+    assert "fi-misc-2, fi-misc-3" in llm.call.call_args.args[1]
+    assert out.count("<h2>Further Information</h2>") == 1
+
+
+def test_complete_fi_adds_header_when_truncated_before_fi_section():
+    llm = MagicMock()
+    llm.call.return_value = _fi_entry(1) + _fi_entry(2)
+    out = _complete(_items(2), llm)
+    assert "<h2>Further Information</h2>" in out
+    assert out.index("<h2>Further Information</h2>") < out.index('id="fi-misc-1"')
+
+
+def test_complete_fi_removes_dead_links_after_repeated_failure():
+    llm = MagicMock()
+    llm.call.return_value = ""  # model never produces the missing entries
+    out = _complete(_items(2) + _fi_entry(1), llm)
+
+    assert llm.call.call_count == 3
+    assert 'href="#fi-misc-2"' not in out
+    assert 'href="#fi-misc-1"' in out
+    assert "Item 2." in out  # the item itself survives
