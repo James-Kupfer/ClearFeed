@@ -60,8 +60,7 @@ SQL conventions:
   - Record dict keys = SQL column aliases → available as {placeholders} in templates.
 
 Aggregate JSON contract:
-  {"actions": [{"type":..., "sector":..., "industry":..., "action":...,
-                "description":..., "priority":1-4, "sources":...,
+  {"actions": [{"sources":..., "action":..., "description":..., "priority":1-4,
                 "record_ids":[<ids of contributing current records>]}]}
   record_ids must reference ids from the input; unrecognised ids are ignored.
 
