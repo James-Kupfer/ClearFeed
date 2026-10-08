@@ -179,8 +179,9 @@ secrets from. `security_config.py` itself sources the actual values from a
 
 ## 7. Known gaps / TODO
 
-- **ActionRuns dedup excludes failed records.** A transient failure (e.g. Todoist
-  503) writes an `ActionRun` with `status='failed'`, which permanently excludes
-  that record from future runs. To retry, delete the row from `ActionRuns` where
-  `profile_name = '<profile>' AND record_id = <id>`. A retry-on-transient-failure
-  mechanism is not yet implemented.
+- **ActionRuns dedup excludes failed records.** A failure writes an `ActionRun`
+  with `status='failed'`, which permanently excludes that record from future
+  runs. `TodoistClient` now retries 429/5xx with backoff before giving up, so a
+  one-off blip no longer causes this, but an outage longer than the retry window
+  (`LLM_RETRY_ATTEMPTS`, `LLM_RETRY_BASE_DELAY`) still does. To retry, delete the
+  row from `ActionRuns` where `profile_name = '<profile>' AND record_id = <id>`.

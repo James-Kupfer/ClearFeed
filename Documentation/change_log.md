@@ -1,5 +1,14 @@
 # Change Log
 
+## 2026-10-07 - Retry transient Todoist errors; strip NUL bytes before insert
+
+**Type**: fix
+**Files**: src/todoist_client.py, src/db.py, tests/test_todoist_retry.py, tests/test_ingest.py, system_architecture.md
+
+Todoist POST/GET responses with HTTP 429 or 5xx were raised as `TodoistError`, which the `@retry` decorator (catching only `requests.RequestException`) never retried. One 503 therefore wrote a permanent `failed` ActionRun (record 4956, `task_connection`). New `TodoistTransientError` (a `TodoistError` subclass) is raised for 429/5xx and retried with the existing backoff; 4xx still fails immediately. Retrying a POST on 503 can in theory duplicate a task the server created before erroring.
+
+`db.insert_content_record` now strips NUL (0x00) bytes from every text field, the label/tag lists, and the raw source before inserting. PostgreSQL text columns reject NUL, so one email (thread 1a116ac78a06f331) failed the insert on every ingest cycle and was never stored.
+
 ## 2026-09-26 - Pin xhtml2pdf in requirements
 
 **Type**: fix

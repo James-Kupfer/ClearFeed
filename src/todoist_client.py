@@ -23,6 +23,30 @@ class TodoistError(Exception):
     """Raised when the Todoist API returns an error or a network failure occurs."""
 
 
+class TodoistTransientError(TodoistError):
+    """A retryable Todoist failure: HTTP 429 or 5xx.
+
+    Subclasses TodoistError so callers that catch TodoistError still see it after
+    retries are exhausted. A failed ActionRun is never retried, so a one-off 503
+    must be absorbed here rather than permanently dropping the record.
+    """
+
+
+def _raise_for_todoist_status(resp: requests.Response, method: str, path: str) -> None:
+    """Raise TodoistTransientError for 429/5xx, TodoistError for other 4xx."""
+    try:
+        resp.raise_for_status()
+    except requests.HTTPError as exc:
+        err_cls = (
+            TodoistTransientError
+            if resp.status_code == 429 or resp.status_code >= 500
+            else TodoistError
+        )
+        raise err_cls(
+            f"Todoist {method} {path} failed ({resp.status_code}): {resp.text}"
+        ) from exc
+
+
 def to_api_priority(human_priority: int | str | None) -> int | None:
     """Convert human-scale priority (1=most urgent, 4=normal) to Todoist REST API scale.
 
@@ -81,18 +105,13 @@ class TodoistClient:
     @retry(
         attempts=config.LLM_RETRY_ATTEMPTS,
         base_delay=config.LLM_RETRY_BASE_DELAY,
-        exceptions=(requests.RequestException,),
+        exceptions=(requests.RequestException, TodoistTransientError),
     )
     def _get(self, path: str) -> Any:
         """GET {TODOIST_BASE_URL}/{path} and return parsed JSON."""
         url = f"{config.TODOIST_BASE_URL}/{path}"
         resp = self._session.get(url, timeout=config.TODOIST_TIMEOUT_SECONDS)
-        try:
-            resp.raise_for_status()
-        except requests.HTTPError as exc:
-            raise TodoistError(
-                f"Todoist GET {path} failed ({resp.status_code}): {resp.text}"
-            ) from exc
+        _raise_for_todoist_status(resp, "GET", path)
         return resp.json()
 
     @staticmethod
@@ -120,7 +139,7 @@ class TodoistClient:
     @retry(
         attempts=config.LLM_RETRY_ATTEMPTS,
         base_delay=config.LLM_RETRY_BASE_DELAY,
-        exceptions=(requests.RequestException,),
+        exceptions=(requests.RequestException, TodoistTransientError),
     )
     def _post(self, path: str, payload: dict) -> Any:
         """POST {TODOIST_BASE_URL}/{path} with JSON body and return parsed JSON."""
@@ -128,12 +147,7 @@ class TodoistClient:
         resp = self._session.post(
             url, json=payload, timeout=config.TODOIST_TIMEOUT_SECONDS
         )
-        try:
-            resp.raise_for_status()
-        except requests.HTTPError as exc:
-            raise TodoistError(
-                f"Todoist POST {path} failed ({resp.status_code}): {resp.text}"
-            ) from exc
+        _raise_for_todoist_status(resp, "POST", path)
         return resp.json()
 
     # ------------------------------------------------------------------

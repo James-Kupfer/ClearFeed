@@ -1155,3 +1155,36 @@ def test_reprocess_summary_skips_excluded_record():
     assert results[0].status == "skipped"
     mock_llm.call_json.assert_not_called()
     mock_update.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# NUL-byte sanitising (PostgreSQL text columns reject 0x00)
+# ---------------------------------------------------------------------------
+
+
+def test_strip_nul_cleans_text_fields_terms_and_raw_source():
+    from db import ContentRecord, _strip_nul
+
+    rec = ContentRecord(
+        source_type="gmail",
+        source_ref="abc",
+        subject="Hi\x00 there",
+        body_text="body\x00\x00text",
+        raw_html="<p>\x00x</p>",
+        labels=["Bus\x00iness"],
+        tags=["ok", "t\x00ag"],
+    )
+    clean = _strip_nul(rec)
+    assert clean.subject == "Hi there"
+    assert clean.body_text == "bodytext"
+    assert clean.raw_html == "<p>x</p>"
+    assert clean.labels == ["Business"]
+    assert clean.tags == ["ok", "tag"]
+    assert rec.subject == "Hi\x00 there"  # input not mutated
+
+
+def test_strip_nul_returns_same_object_when_clean():
+    from db import ContentRecord, _strip_nul
+
+    rec = ContentRecord(source_type="gmail", source_ref="abc", body_text="fine")
+    assert _strip_nul(rec) is rec

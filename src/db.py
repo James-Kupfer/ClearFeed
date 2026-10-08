@@ -12,7 +12,7 @@ timestamp — matching how Python writes timestamps via utils.now_cst().
 import json
 import logging
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields, replace
 from datetime import datetime
 from typing import Any, Generator
 
@@ -90,6 +90,22 @@ class ContentRecord:
     id: int | None = None
 
 
+def _strip_nul(rec: ContentRecord) -> ContentRecord:
+    """Return rec with NUL (0x00) bytes removed from every text field.
+
+    PostgreSQL text columns reject NUL; one stray byte in an email body otherwise
+    fails the insert on every ingest cycle, so that email is never stored.
+    """
+    changes: dict[str, Any] = {}
+    for f in fields(rec):
+        value = getattr(rec, f.name)
+        if isinstance(value, str) and "\x00" in value:
+            changes[f.name] = value.replace("\x00", "")
+        elif isinstance(value, list) and any(isinstance(v, str) and "\x00" in v for v in value):
+            changes[f.name] = [v.replace("\x00", "") if isinstance(v, str) else v for v in value]
+    return replace(rec, **changes) if changes else rec
+
+
 def insert_content_record(rec: ContentRecord) -> int:
     """Insert a ContentRecord row plus its RecordTerms and SourceDocuments. Returns the new id.
 
@@ -97,6 +113,7 @@ def insert_content_record(rec: ContentRecord) -> int:
         DuplicateRecordError: if source_type+source_ref already present.
         DbError: on other database failures.
     """
+    rec = _strip_nul(rec)
     try:
         with get_connection() as conn:
             cursor = conn.cursor()
