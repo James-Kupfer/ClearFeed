@@ -176,6 +176,65 @@ def _reply_visit(
             context.close()
 
 
+_DUMP_JS = """
+() => {
+  const sel = 'button, [role=button], [role=textbox], [contenteditable=true], textarea, input[type=text]';
+  const seen = new Set(), rows = [];
+  for (const el of document.querySelectorAll(sel)) {
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height) continue;            // skip invisible
+    const label = (el.getAttribute('aria-label') || el.innerText || el.placeholder || '')
+      .replace(/\\s+/g, ' ').trim().slice(0, 80);
+    const role = el.getAttribute('role') || el.tagName.toLowerCase();
+    const row = role + ' | ' + label;
+    if (!label && role === 'div') continue;
+    if (!seen.has(row)) { seen.add(row); rows.push(row); }
+  }
+  return rows;
+}
+"""
+
+
+def inspect_page(url: str, out_path=None) -> None:
+    """Visible browser: list the page's visible buttons / text boxes, let the user
+    click their reply control, then list again. Output also goes to `out_path`.
+    Nothing is typed or sent."""
+    from playwright.sync_api import sync_playwright
+
+    lines: list[str] = []
+
+    def emit(text: str) -> None:
+        enc = sys.stdout.encoding or "utf-8"  # Windows consoles can't print every character
+        print(text.encode(enc, "replace").decode(enc))
+        lines.append(text)
+
+    def dump(page, title: str) -> None:
+        emit(f"\n=== {title} === url: {page.url.split('?')[0]}")
+        for row in page.evaluate(_DUMP_JS):
+            emit("  " + row)
+
+    with sync_playwright() as p:
+        context = _launch(p, headless=False)
+        try:
+            page = context.pages[0] if context.pages else context.new_page()
+            page.goto(url, wait_until="domcontentloaded")
+            page.wait_for_load_state("load")
+            page.wait_for_timeout(3000)  # let LinkedIn's client-side render finish
+            dump(page, "initial page")
+            input(
+                "\nIn the browser, click what you would click to REPLY to this person "
+                "(so a message box shows), then press Enter here... "
+            )
+            page.wait_for_timeout(1000)
+            dump(page, "after your click")
+        finally:
+            context.close()
+    if out_path:
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text("\n".join(lines), encoding="utf-8")
+        print(f"\nSaved to {out_path}")
+
+
 def send_message(
     url: str,
     body: str,
@@ -242,11 +301,22 @@ if __name__ == "__main__":
         "type the message, do NOT send",
     )
     parser.add_argument(
+        "--inspect",
+        nargs="?",
+        const="",
+        metavar="URL",
+        help="list the page's buttons/text boxes before and after you click your reply "
+        "control (prompts for the link if omitted); types and sends nothing",
+    )
+    parser.add_argument(
         "--profile", default="profiles/task_connection.yaml", help="profile supplying the message"
     )
     args = parser.parse_args()
     if args.login:
         login()
+    elif args.inspect is not None:
+        inspect_url = args.inspect.strip() or input("Paste the invitation link, then press Enter: ").strip()
+        inspect_page(validate_url(inspect_url), config.LOG_DIR / "linkedin_inspect.txt")
     elif args.try_reply is not None:
         from utils import read_yaml_profile
 

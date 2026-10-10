@@ -9,6 +9,7 @@
 ::   clearfeed.bat reprocess --label Investment
 ::   clearfeed.bat reprocess-summary --label Investment
 ::   clearfeed.bat linkedin-login
+::   clearfeed.bat linkedin-inspect   (lists the page's buttons/boxes to find the reply control; sends nothing)
 ::   clearfeed.bat linkedin-try-reply   (prompts for an invitation link; types the reply, does not send)
 
 setlocal
@@ -73,6 +74,11 @@ if "%1"=="linkedin-try-reply" (
     ) else (
         python "%~dp0src\linkedin_client.py" --try-reply "%~2"
     )
+    goto :end
+)
+
+if "%1"=="linkedin-inspect" (
+    python "%~dp0src\linkedin_client.py" --inspect
     goto :end
 )
 
