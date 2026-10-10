@@ -1,5 +1,12 @@
 # Change Log
 
+## 2026-10-10 - Ignore via the profile page's Ignore button
+
+**Type**: fix
+**Files**: src/linkedin_client.py, profiles/task_connection.yaml
+
+On a real invitation profile page Ignore is a button, not a link, so there is no URL to extract. `task_connection` now opens `review_url` (the profile link from the email) and clicks `Ignore` (`linkedin_ignore.click_text`). After the click the step checks the button is gone and otherwise raises, so an unconfirmed ignore is recorded in `ActionRuns.error`. Exercised against a local stand-in page only.
+
 ## 2026-10-10 - Reply to declined connection requests on LinkedIn instead of by email
 
 **Type**: feature

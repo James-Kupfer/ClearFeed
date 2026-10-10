@@ -67,7 +67,7 @@ def _visit(url: str, click_text: str | None, headless: bool, timeout_s: int) -> 
     Raises LinkedInError when the session is signed out or the button is absent.
     """
     from playwright.sync_api import Error as PlaywrightError
-    from playwright.sync_api import sync_playwright
+    from playwright.sync_api import expect, sync_playwright
 
     timeout_ms = timeout_s * 1000
     with sync_playwright() as p:
@@ -95,6 +95,13 @@ def _visit(url: str, click_text: str | None, headless: bool, timeout_s: int) -> 
                     page.wait_for_load_state("load")
                 except PlaywrightError as exc:
                     raise LinkedInError(f"Could not click {click_text!r}: {exc}") from exc
+                # Confirm: the button should be gone once the request is ignored.
+                try:
+                    expect(target).to_be_hidden()
+                except AssertionError as exc:
+                    raise LinkedInError(
+                        f"Clicked {click_text!r} but it is still on the page — not confirmed"
+                    ) from exc
         finally:
             context.close()
 
