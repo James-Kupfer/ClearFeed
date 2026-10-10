@@ -238,13 +238,13 @@ Apply the schema:
 psql -U clearfeed -d clearfeed -f schema_postgres.sql
 ```
 Connection settings (host/port/name/user) are in `src/config.py`; the password
-is a secret sourced from `db_keys.py` (`DB_PASSWORD`, see Secrets below).
+is a secret sourced from `LLM_Config/shared/postgres/role_clearfeed.py` (`DB_PASSWORD`, see Secrets below).
 
 ### 2. Secrets
 `security_config.py` at the project root (gitignored — not in the repo) is
 the single place secrets/PII are imported into config; `config.py` reads
 values from it and never inlines a secret itself. `security_config.py` in
-turn imports from a `Secrets/` directory that lives **outside the repo**
+turn imports from the `LLM_Config/` directory that lives **outside the repo**
 (a plain path on your machine, not a project subfolder). Populate
 `ANTHROPIC_API_KEY`, Gmail OAuth/app-password values, `TODOIST_API_TOKEN`,
 and `DB_PASSWORD` there.
@@ -374,7 +374,7 @@ ClearFeed/
 ├── logs/                     # timestamped run logs (gitignored)
 ├── tests/
 ├── schema_postgres.sql       # PostgreSQL DDL (incl. SourceDocuments — full original source)
-├── security_config.py        # gitignored, project-root; imports secrets from an external Secrets/ dir (not in this repo)
+├── security_config.py        # gitignored, project-root; imports secrets from an external LLM_Config/ dir (not in this repo)
 ├── clearfeed.bat             # stage runner (ingest|dispatch|action|export|reprocess|…)
 └── master.bat                # tests + ingest + dispatch every profile in profiles/ (digest-kind only — see note above)
 ```

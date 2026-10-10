@@ -1,8 +1,7 @@
 kind: action
 name: task_personal
 target: todoist
-model: sonnet-5.5
-
+model: sonnet
 # --- Trigger ---
 # Scans Personal records tagged actionable in the last window_hours that
 # haven't been actioned by this profile yet. Each matching record is processed

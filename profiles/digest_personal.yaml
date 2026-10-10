@@ -1,6 +1,6 @@
 kind: digest
 name: digest_personal
-model: sonnet-5.5
+model: sonnet
 recipient: digests@kupfer.me
 subject_template: 'Personal Digest - {period_end_date}'
 dedup_schedule: weekly_saturday

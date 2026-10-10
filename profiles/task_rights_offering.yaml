@@ -2,8 +2,7 @@ kind: action
 name: task_rights_offering
 target: todoist
 mode: per_record
-model: sonnet-5.5
-
+model: sonnet
 # --- Trigger ---
 # Picks up any unactioned rights offering record published by ROM.
 # No time-window filter — rights offerings are infrequent and always actionable.

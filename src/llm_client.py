@@ -16,6 +16,7 @@ import anthropic
 import httpx
 
 import config
+import llm_config
 import sys
 import os
 
@@ -159,6 +160,7 @@ class LLMClient:
             raise ValueError(
                 f"Unknown LLM backend: {backend_key!r}. Valid: {list(_BACKEND_REGISTRY)}"
             )
+        llm_config.load_models()  # fail fast on a missing/stale shared LLM config
         self._backend: Backend = _BACKEND_REGISTRY[backend_key]()
         self._max_tokens = max_tokens
         self._accum_input: int = 0
@@ -213,7 +215,7 @@ class LLMClient:
             operation: key into LLM_ROUTING (e.g. "classify", "digest").
             prompt: user-turn content.
             system: optional system prompt.
-            model_override: alias ("haiku"/"sonnet"/"opus") or full model ID; bypasses routing.
+            model_override: alias ("haiku"/"sonnet"/"opus"/"fable") from llm_config.toml; bypasses routing.
             max_tokens: overrides instance default.
             cacheable: whether to mark `system` with cache_control (see
                 AnthropicBackend.call). Default True; pass False for calls known to
@@ -224,9 +226,7 @@ class LLMClient:
             Raw LLM text response.
         """
         alias = model_override or config.LLM_ROUTING.get(operation, "haiku")
-        model_id = config.MODEL_IDS.get(
-            alias, alias
-        )  # fall through if already a full ID
+        model_id = llm_config.resolve(alias)
         tokens = max_tokens or self._max_tokens
         log.debug("LLM call: operation=%s model=%s", operation, model_id)
         return self._backend.call(model_id, system, prompt, tokens, cacheable)

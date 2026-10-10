@@ -1,8 +1,7 @@
 kind: action
 name: task_professional
 target: todoist
-model: sonnet-5.5
-
+model: sonnet
 # --- Trigger ---
 # Scans Professional records tagged actionable in the last window_hours that
 # haven't been actioned by this profile yet. Each matching record is processed

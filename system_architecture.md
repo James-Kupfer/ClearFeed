@@ -127,7 +127,7 @@ prompt — the two action-digest profiles each carry their own copy.)
 | **Change which digest owns a topic (Technology / Science / Miscellaneous)** | Edit the `## TOPIC OWNERSHIP` block identically in all three profile prompts (a test enforces this). If the owner must receive records labelled for another digest, add tag routing to its `sql:` band: an `OR` branch matching the other digest's labels plus the topic's tags. Each digest reports only the facets it owns, so one record can feed both. |
 | **Change which model an operation uses** | `config.LLM_ROUTING` (per-profile override: the profile's `model:` field). |
 | **Change ingest/orchestrator cadence** | `config.INGEST_POLL_INTERVAL_MINUTES`; the task XML triggers for digests/actions. |
-| **Add a secret / integration key** | Add to `Secrets/<name>.py`; import it in `security_config.py`. Never inline secrets. |
+| **Add a secret / integration key** | Add to `LLM_Config/projects/ClearFeed/<name>.py` (or `LLM_Config/shared/<service>/` if another repo also uses it); import it in `security_config.py`. Never inline secrets. |
 | **Add a new pipeline kind** | New `src/<x>.py` with `_load_profile` (validate `kind`); a `clearfeed.bat` stage; a launcher if scheduled. |
 
 ---
@@ -136,7 +136,7 @@ prompt — the two action-digest profiles each carry their own copy.)
 
 | System | Where | Auth / secret |
 |--------|-------|---------------|
-| Gmail | `gmail_client.py` (API read/label/trash + SMTP send) | OAuth client secret + token cache; app password — in `Secrets/` |
+| Gmail | `gmail_client.py` (API read/label/trash + SMTP send) | OAuth client secret + token cache; app password — in `LLM_Config/shared/google/` |
 | Anthropic | `llm_client.py` | `ANTHROPIC_API_KEY` (via `security_config.py`) |
 | Todoist | `todoist_client.py` — REST **v1** (`config.TODOIST_BASE_URL`). Responses may be wrapped `{"results": [...]}`; `_unwrap_list` normalizes both bare lists and envelopes. Missing projects are auto-created. | `TODOIST_API_TOKEN` (via `security_config.py`) |
 | PostgreSQL | `db.py` (`localhost:5432`, DB `clearfeed`) | host/port/name/user in `config.py`; `DB_PASSWORD` in `security_config.py` |
@@ -144,8 +144,8 @@ prompt — the two action-digest profiles each carry their own copy.)
 Secrets pattern: `security_config.py` lives at the project root, is
 gitignored (never committed), and is the only file `config.py` imports
 secrets from. `security_config.py` itself sources the actual values from a
-`Secrets/` directory that lives **outside this repo** (e.g.
-`C:\Users\<you>\Secrets`); it is not a repo subfolder and does not need a
+`LLM_Config/` directory that lives **outside this repo** (e.g.
+`C:\Users\<you>\GitHub\LLM_Config`); it is not a repo subfolder and does not need a
 `.gitignore` entry of its own.
 
 ---

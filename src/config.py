@@ -10,12 +10,10 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent  # src/config.py -> project root
 
 # --- LLM model versions ---
-MODEL_IDS = {
-    "haiku": "claude-haiku-4-5-20251001",
-    "sonnet": "claude-sonnet-5",
-    "sonnet-5.5": "claude-sonnet-5-5",  # digest profiles; "sonnet" stays on 5 for ingest/action
-    "opus": "claude-opus-5-5",
-}
+# Aliases used throughout ("haiku" | "sonnet" | "opus" | "fable") resolve to API model IDs
+# via llm_config.resolve() from the shared llm_config.toml, which
+# GitHub\LLM_Config\src\distribute_llm_config.bat ships into src/ daily. Change the
+# floating alias there to move ClearFeed to a new model; no ID is pinned here.
 
 # --- Paths ---
 INTAKE_DIR = Path(r"C:\Documents\_intake")  # file-intake watch folder (v2)
@@ -96,8 +94,7 @@ LLM_ROUTING = {
     "digest": "haiku",  # short-window digest compose
     "synthesis": "sonnet",  # cross-period synthesis compose
 }
-# Max output tokens. Haiku 4.5 supports up to 64,000; Sonnet 5 and Opus 5 both
-# support up to 128,000. Calls stream (see llm_client), so large values don't
+# Max output tokens. Haiku 5.5, Sonnet 5.5 and Opus 5.5 all support up to 128,000. Calls stream (see llm_client), so large values don't
 # risk HTTP timeouts.
 LLM_MAX_TOKENS = 16000      # default for classify/summarize (small/medium outputs)
 # digest/synthesis compose — long HTML bodies with many items. Bumped 32000 -> 64000 after

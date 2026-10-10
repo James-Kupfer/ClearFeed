@@ -1,4 +1,4 @@
-﻿"""Stage 3: Digest dispatch for ClearFeed.
+"""Stage 3: Digest dispatch for ClearFeed.
 
 Usage:
     python -m dispatch profiles/investment_digest.yaml
@@ -10,7 +10,7 @@ and writes a DigestRuns record.
 Profile schema (YAML, self-contained — prompt inlined as the last key):
     kind: digest                  # discriminator (validated; optional)
     name: investment_digest
-    model: sonnet                 # optional; overrides LLM_ROUTING["synthesis"|"digest"]; haiku|sonnet|sonnet-5.5|opus
+    model: sonnet                 # optional; overrides LLM_ROUTING["synthesis"|"digest"]; haiku|sonnet|opus|fable
     recipient: summary@kupfer.me  # optional; falls back to DEFAULT_RECIPIENT
     output: [email]               # optional; default [email]
     inputs:

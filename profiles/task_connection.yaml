@@ -1,8 +1,7 @@
 kind: action
 name: task_connection
 target: todoist
-model: sonnet-5.5
-
+model: sonnet
 # --- Trigger ---
 # Scans records classified in the last window_hours that haven't been actioned
 # by this profile yet. tag_match: all means the record must carry EVERY listed tag.
