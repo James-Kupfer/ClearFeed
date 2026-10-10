@@ -189,65 +189,43 @@ This must be present in `trigger.sql` — `_load_profile` rejects profiles witho
 
 **`priority` in `todoist:` blocks** uses the **human scale (1 = most urgent, 4 = normal)**. `todoist_client.py` inverts it to the Todoist REST API scale (`api_priority = 5 − human_priority`) at the point the request is built. Profiles and prompts never need to express the REST scale.
 
-**Auto-reply (optional, `per_record` only):** an `auto_reply:` block replaces the
+**Auto-decline (optional, `per_record` only):** an `auto_decline:` block replaces the
 target handler for records whose prompt JSON matches. `profiles/task_connection.yaml`
 uses it so a connection request the prompt marks `action: Decline` is not turned
-into a task. LinkedIn's notification emails come from no-reply addresses
-(`invitations@linkedin.com`, `messages-noreply@linkedin.com`), so
-`task_connection` uses `channel: linkedin`: it sends the configured `body` as a
-message on LinkedIn's website through the signed-in browser profile, then
-ignores the invitation and moves the original Gmail message to Trash. If the
-reply can't be sent and confirmed, nothing else happens and the normal task is
-created instead. All other actions still create tasks.
-
-`channel: gmail` (the default) emails the `body` to the sender (Reply-To, else
-From; threaded on the original) and trashes the original; addresses matching
-`skip_addresses` are never emailed, and if none qualifies the task is created.
+into a task: ClearFeed opens the requester's LinkedIn page (`review_url`, the
+"view profile" link from the email) in a signed-in browser profile, clicks
+**Ignore** so LinkedIn archives the request, and moves the original Gmail message
+to Trash. No message is sent to the requester. If the ignore can't be done and
+confirmed, nothing is trashed and the normal task is created instead. All other
+actions still create tasks.
 
 ```yaml
-auto_reply:
-  when_key: action        # prompt JSON key to test
-  when_value: Decline     # case-insensitive exact match
-  trash: true             # optional, default true: trash the original message after replying
-  channel: linkedin       # gmail (default) | linkedin
-  linkedin_reply:         # channel: linkedin — send the body as a LinkedIn message
-    url_key: review_url   #   prompt JSON key whose page has the message box (https linkedin.com only)
-    compose_label: "Write a message"  # optional: message box's accessible name
-    pre_click_text: null  #   optional: button/link to click first to reveal the box
-  skip_addresses: ["*noreply*", "invitations@linkedin.com"]  # channel: gmail — never email these
-  linkedin_ignore:        # optional: then open this URL in the logged-in LinkedIn browser profile
-    url_key: decline_url  #   prompt JSON key holding the ignore link (must be https on linkedin.com)
-    click_text: null      #   optional button/link label to click on that page
-    not_url_key: accept_url  # optional: never open the link if it equals this key's value
-  body: |                 # sent verbatim as plain text — no {placeholders}
-    ...
+auto_decline:
+  when_key: action          # prompt JSON key to test
+  when_value: Decline       # case-insensitive exact match
+  trash: true               # optional, default true: trash the Gmail message afterwards
+  linkedin_ignore:
+    url_key: review_url     # prompt JSON key holding the LinkedIn page (https linkedin.com only)
+    click_text: "Ignore"    # button to click; it must disappear, else the step counts as failed
+    not_url_key: accept_url # optional: refuse if the URL equals this key's value
 ```
 
 The trigger SQL must select `cr.source_type` and `cr.source_ref` (the Gmail
-message id). The `ActionRuns` row records `target = gmail_reply` and the sent
-message id as `external_id`. The reply is sent once and never retried; if the
-send fails the record is marked `failed` and, like any failed ActionRun, is not
-retried automatically (see Known gaps in `system_architecture.md`). Uses the
-existing `gmail.send` / `gmail.modify` OAuth scopes — no re-consent needed.
+message id). The `ActionRuns` row records `target = linkedin_ignore`. After a
+confirmed ignore, a failed trash is recorded in `ActionRuns.error` and not
+retried (status stays `created`).
 
-**Rehearsing the LinkedIn reply:** `clearfeed.bat linkedin-try-reply`
-prompts for a real invitation link (e.g. the Review link in a notification
-email; pasting at the prompt avoids cmd.exe mangling `&` in the URL), opens a visible browser on it, types the message into LinkedIn's message box, and stops
-without sending. Use it to confirm `compose_label` / `pre_click_text` before
-relying on the automation.
-
-**LinkedIn ignore (`linkedin_ignore:`)** archives the request on LinkedIn after the
-reply and trash. LinkedIn has no API for this, so `src/linkedin_client.py` drives
-a persistent Chromium profile (`config.LINKEDIN_BROWSER_PROFILE_DIR`, gitignored)
-with Playwright. One-time setup: `pip install -r requirements.txt`,
+**LinkedIn setup.** LinkedIn has no API for this, so `src/linkedin_client.py`
+drives a persistent Chromium profile (`config.LINKEDIN_BROWSER_PROFILE_DIR`,
+gitignored) with Playwright. One-time: `pip install -r requirements.txt`,
 `playwright install chromium`, then `clearfeed.bat linkedin-login` and sign in.
-It only opens https `linkedin.com` URLs, and reports a signed-out session instead
-of silently doing nothing. Automating LinkedIn violates its terms and can get the
-account restricted. The click behavior was tested only against a local stand-in
-page, not LinkedIn: if opening the link alone doesn't archive the request, set
-`click_text` to the button's label. Failures here are recorded in
-`ActionRuns.error` and not retried; the status stays `created` because the reply
-already went out.
+It only opens https `linkedin.com` URLs and reports a signed-out session instead
+of silently doing nothing. `clearfeed.bat linkedin-inspect` lists a page's buttons
+and boxes step by step (clicks and types nothing) to help find the right
+`click_text` if LinkedIn changes. Automating LinkedIn violates its terms and can
+get the account restricted. The Ignore button's label was confirmed by hand on a
+real invitation page; the automated click was exercised only against a local
+stand-in page.
 
 **Record column names** in `content`/`description` come directly from the SQL `SELECT` column aliases — no separate `inputs:` list. `{placeholders}` also include prompt JSON keys (prompt wins on collision).
 

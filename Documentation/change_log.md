@@ -1,5 +1,14 @@
 # Change Log
 
+## 2026-10-10 - Decline = ignore on LinkedIn + trash; drop the reply
+
+**Type**: feature (supersedes the same-day auto-reply entries below)
+**Files**: src/action_dispatch.py, src/linkedin_client.py, src/gmail_client.py, profiles/task_connection.yaml, clearfeed.bat, tests/test_linkedin_client.py, tests/test_gmail_trash.py, tests/test_action_dispatch.py, README.md, system_architecture.md
+
+LinkedIn's notification emails have no return address and messaging a pending inviter goes through an InMail-style subject+body composer, so replying is dropped. `task_connection` now handles `action: Decline` with a new `auto_decline:` block: open `review_url`, click the `Ignore` button, confirm it disappeared, then trash the Gmail message. No message is sent. If the ignore can't be done and confirmed, nothing is trashed and the normal Todoist task is created.
+
+Removed: the `auto_reply:` block and its Gmail and LinkedIn reply channels, `GmailClient.send_reply` / `get_message_headers`, `linkedin_client.send_message` / `--try-reply`, the `linkedin-try-reply` stage, and `skip_addresses`. They remain in git history at 9ecd45b. Kept: `linkedin-login`, `linkedin-inspect`, `trash_message`. `ActionRuns.target` is `linkedin_ignore` for these rows. The Ignore label ("Ignore <name>'s request to connect") was confirmed by hand on real invitation pages; the automated click is verified only against a local stand-in page.
+
 ## 2026-10-10 - Ignore via the profile page's Ignore button
 
 **Type**: fix

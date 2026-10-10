@@ -1,26 +1,24 @@
-"""Reply to and ignore a LinkedIn connection invitation through a logged-in browser.
+"""Ignore a LinkedIn connection invitation through a logged-in browser profile.
 
 LinkedIn has no public API for this, so ClearFeed drives a persistent Playwright
-profile that you signed in to once: `send_message` opens a link from the
-notification email, types a message into LinkedIn's composer and sends it;
-`ignore_invitation` opens the invitation's own "ignore" link and optionally
-clicks a button on the page.
+profile that you signed in to once: `ignore_invitation` opens the requester's
+page (the "view profile" link from the notification email) and clicks the
+Ignore button, then checks the button is gone.
 
 Caveat: LinkedIn's terms prohibit automated access; use can get the account
-restricted. None of the page interactions have been verified against a live
-account. Rehearse the reply without sending anything:
-    clearfeed.bat linkedin-try-reply "<review link from a real invitation email>"
-and if opening the ignore link alone does not archive the request, set
-`click_text` in the profile's `linkedin_ignore:` block to the button's label.
+restricted. Verified by hand against a real invitation page (the button is
+labelled "Ignore <name>'s request to connect"), but the automated click has only
+been exercised against a local stand-in page.
 
 One-time sign-in (opens a visible browser; close it when logged in):
     clearfeed.bat linkedin-login
+List a page's buttons and boxes step by step (types and clicks nothing):
+    clearfeed.bat linkedin-inspect
 """
 
 import argparse
 import logging
 import os
-import re
 import sys
 from urllib.parse import urlparse
 
@@ -106,76 +104,6 @@ def _visit(url: str, click_text: str | None, headless: bool, timeout_s: int) -> 
             context.close()
 
 
-def _compose(page, body: str, compose_label: str, pre_click_text: str | None):
-    """Open the composer and type `body`. Returns the composer locator."""
-    from playwright.sync_api import Error as PlaywrightError
-
-    try:
-        if pre_click_text:
-            label = re.compile(re.escape(pre_click_text), re.I)
-            page.get_by_role("button", name=label).or_(
-                page.get_by_role("link", name=label)
-            ).first.click()
-        composer = page.get_by_role(
-            "textbox", name=re.compile(re.escape(compose_label), re.I)
-        ).first
-        composer.click()
-        # Shift+Enter is a line break; a bare Enter would send in LinkedIn's composer.
-        for i, line in enumerate(body.split("\n")):
-            if i:
-                page.keyboard.press("Shift+Enter")
-            if line:
-                page.keyboard.type(line)
-        return composer
-    except PlaywrightError as exc:
-        raise LinkedInError(f"Could not find/fill the message box: {exc}") from exc
-
-
-def _reply_visit(
-    url: str,
-    body: str,
-    compose_label: str,
-    pre_click_text: str | None,
-    send: bool,
-    headless: bool,
-    timeout_s: int,
-) -> None:
-    """Open `url`, type `body` into the composer, and (if `send`) send and confirm it."""
-    from playwright.sync_api import Error as PlaywrightError
-    from playwright.sync_api import expect, sync_playwright
-
-    with sync_playwright() as p:
-        context = _launch(p, headless)
-        try:
-            page = context.pages[0] if context.pages else context.new_page()
-            page.set_default_timeout(timeout_s * 1000)
-            try:
-                page.goto(url, wait_until="domcontentloaded")
-                page.wait_for_load_state("load")
-            except PlaywrightError as exc:
-                raise LinkedInError(f"Could not load page: {exc}") from exc
-            if any(m in page.url for m in _LOGIN_MARKERS):
-                raise LinkedInError(
-                    "LinkedIn session expired — run `clearfeed.bat linkedin-login`"
-                )
-
-            composer = _compose(page, body, compose_label, pre_click_text)
-            if not send:
-                input("Message typed, NOT sent. Inspect the browser, then press Enter to close... ")
-                return
-
-            try:
-                page.get_by_role("button", name=re.compile(r"^send$", re.I)).first.click()
-                # Confirm: composer cleared AND the sent text now shows in the thread.
-                expect(composer).to_have_text("")
-                snippet = next((ln.strip() for ln in body.split("\n") if ln.strip()), "")[:40]
-                expect(page.get_by_text(snippet).first).to_be_visible()
-            except (PlaywrightError, AssertionError) as exc:
-                raise LinkedInError(f"Could not confirm the message was sent: {exc}") from exc
-        finally:
-            context.close()
-
-
 _DUMP_JS = """
 () => {
   const sel = 'button, [role=button], [role=menuitem], [role=option], [role=textbox], ' +
@@ -204,8 +132,7 @@ _DUMP_JS = """
 
 def inspect_page(url: str, out_path=None) -> None:
     """Visible browser: list the page's visible controls, then again after each step
-    the user performs by hand (More -> Message ...). Output also goes to `out_path`.
-    Nothing is typed or sent."""
+    the user performs by hand. Output also goes to `out_path`. Nothing is clicked or typed."""
     from playwright.sync_api import sync_playwright
 
     lines: list[str] = []
@@ -247,38 +174,13 @@ def inspect_page(url: str, out_path=None) -> None:
         print(f"\nSaved to {out_path}")
 
 
-def send_message(
-    url: str,
-    body: str,
-    compose_label: str = "Write a message",
-    pre_click_text: str | None = None,
-    headless: bool | None = None,
-    timeout_s: int | None = None,
-) -> None:
-    """Validate `url`, then send `body` as a LinkedIn message from that page.
-
-    Raises LinkedInError if anything is missing or the send can't be confirmed.
-    """
-    safe_url = validate_url(url)
-    _reply_visit(
-        safe_url,
-        body,
-        compose_label,
-        pre_click_text,
-        True,
-        config.LINKEDIN_HEADLESS if headless is None else headless,
-        timeout_s or config.LINKEDIN_NAV_TIMEOUT_SECONDS,
-    )
-    log.info("[linkedin] message sent via %s", safe_url.split("?")[0])
-
-
 def ignore_invitation(
     url: str,
     click_text: str | None = None,
     headless: bool | None = None,
     timeout_s: int | None = None,
 ) -> None:
-    """Validate `url`, then ignore the invitation it points at. Raises LinkedInError."""
+    """Validate `url`, open it, and click `click_text` to ignore the invitation. Raises LinkedInError."""
     safe_url = validate_url(url)
     _visit(
         safe_url,
@@ -305,23 +207,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="LinkedIn browser-session helper.")
     parser.add_argument("--login", action="store_true", help="sign in once (visible browser)")
     parser.add_argument(
-        "--try-reply",
-        nargs="?",
-        const="",
-        metavar="URL",
-        help="rehearse the reply on a real invitation link (prompts if omitted): "
-        "type the message, do NOT send",
-    )
-    parser.add_argument(
         "--inspect",
         nargs="?",
         const="",
         metavar="URL",
-        help="list the page's buttons/text boxes before and after you click your reply "
-        "control (prompts for the link if omitted); types and sends nothing",
-    )
-    parser.add_argument(
-        "--profile", default="profiles/task_connection.yaml", help="profile supplying the message"
+        help="list the page's buttons/boxes before and after each step you do by hand "
+        "(prompts for the link if omitted); clicks and types nothing",
     )
     args = parser.parse_args()
     if args.login:
@@ -329,23 +220,5 @@ if __name__ == "__main__":
     elif args.inspect is not None:
         inspect_url = args.inspect.strip() or input("Paste the invitation link, then press Enter: ").strip()
         inspect_page(validate_url(inspect_url), config.LOG_DIR / "linkedin_inspect.txt")
-    elif args.try_reply is not None:
-        from utils import read_yaml_profile
-
-        # Pasting at a prompt avoids cmd.exe mangling '&' and '%' in LinkedIn links.
-        try_url = args.try_reply.strip() or input("Paste the invitation link, then press Enter: ").strip()
-
-        prof = read_yaml_profile(config.BASE_DIR / args.profile)
-        cfg = prof["auto_reply"]
-        opts = cfg.get("linkedin_reply", {})
-        _reply_visit(
-            validate_url(try_url),
-            str(cfg["body"]).strip(),
-            opts.get("compose_label", "Write a message"),
-            opts.get("pre_click_text"),
-            False,
-            False,
-            config.LINKEDIN_NAV_TIMEOUT_SECONDS,
-        )
     else:
         parser.print_help()

@@ -62,91 +62,160 @@ def test_ignore_invitation_passes_click_text_through():
 
 # --- wiring in action_dispatch ---------------------------------------------
 
-_LI = {"url_key": "decline_url", "click_text": "Ignore", "not_url_key": "accept_url"}
+_CFG = {
+    "when_key": "action",
+    "when_value": "Decline",
+    "trash": True,
+    "linkedin_ignore": {"url_key": "review_url", "click_text": "Ignore", "not_url_key": "accept_url"},
+}
 
 
-def _profile(li=_LI):
+def _profile(**overrides):
     return {
         "name": "task_connection",
         "target": "todoist",
         "todoist": {"project": "P", "content": "c", "description": "", "priority": 3},
-        "auto_reply": {
-            "when_key": "action", "when_value": "Decline", "body": "no", "trash": True,
-            "linkedin_ignore": li,
-        },
+        "auto_decline": {**_CFG, **overrides},
     }
 
 
-def _gmail():
-    g = MagicMock()
-    g.get_message_headers.return_value = {
-        "thread_id": "t", "headers": {"from": "a@b.com", "subject": "s", "message-id": "<m>"}
-    }
-    g.send_reply.return_value = "sent-1"
-    return g
+_PR = {
+    "action": "Decline",
+    "review_url": "https://www.linkedin.com/in/someone/",
+    "accept_url": "https://www.linkedin.com/accept/1",
+}
+_REC = {"id": 8, "source_type": "gmail", "source_ref": "msg-8"}
 
 
-_REC = {"id": 3, "source_type": "gmail", "source_ref": "msg-1"}
-_PR = {"action": "Decline", "decline_url": "https://www.linkedin.com/ignore/1",
-       "accept_url": "https://www.linkedin.com/accept/1"}
+def test_auto_decline_matches_is_exact_but_case_and_whitespace_insensitive():
+    from action_dispatch import _auto_decline_matches
+
+    p = _profile()
+    assert _auto_decline_matches(p, {"action": "Decline"})
+    assert _auto_decline_matches(p, {"action": " decline "})
+    assert not _auto_decline_matches(p, {"action": "Review"})
+    assert not _auto_decline_matches(p, {"action": "Declined"})
+    assert not _auto_decline_matches(p, {"is_job_alert": True})
+    assert not _auto_decline_matches({"name": "x"}, {"action": "Decline"})
 
 
-def test_decline_opens_ignore_link_after_reply_and_trash():
-    from action_dispatch import _handle_auto_reply
+def test_decline_ignores_on_linkedin_then_trashes_and_never_sends_anything():
+    from action_dispatch import _handle_auto_decline
 
-    gmail = _gmail()
-    with patch("linkedin_client.ignore_invitation") as ignore:
-        result = _handle_auto_reply(_REC, _profile(), _PR, {"gmail": gmail})
+    gmail, order = MagicMock(), []
+    gmail.trash_message.side_effect = lambda *_: order.append("trash")
+    with patch("linkedin_client.ignore_invitation", side_effect=lambda *a, **k: order.append("ignore")) as ig:
+        result = _handle_auto_decline(_REC, _profile(), _PR, {"gmail": gmail})
 
-    ignore.assert_called_once_with("https://www.linkedin.com/ignore/1", click_text="Ignore")
-    assert result.status == "created" and result.error is None
+    assert order == ["ignore", "trash"]
+    ig.assert_called_once_with("https://www.linkedin.com/in/someone/", click_text="Ignore")
+    gmail.trash_message.assert_called_once_with("msg-8")
+    assert not gmail.send_reply.called and not gmail.send_message.called
+    assert result.status == "created" and result.target == "linkedin_ignore" and result.error is None
 
 
-def test_linkedin_failure_after_reply_stays_created_with_error():
-    from action_dispatch import _handle_auto_reply
+def test_ignore_failure_returns_none_and_does_not_trash():
+    from action_dispatch import _handle_auto_decline
 
-    with patch("linkedin_client.ignore_invitation", side_effect=RuntimeError("expired")):
-        result = _handle_auto_reply(_REC, _profile(), _PR, {"gmail": _gmail()})
+    gmail = MagicMock()
+    with patch("linkedin_client.ignore_invitation", side_effect=RuntimeError("button gone?")):
+        result = _handle_auto_decline(_REC, _profile(), _PR, {"gmail": gmail})
+
+    assert result is None
+    gmail.trash_message.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "pr",
+    [
+        {**_PR, "review_url": ""},
+        {**_PR, "review_url": _PR["accept_url"]},
+    ],
+)
+def test_missing_or_accept_url_returns_none_without_opening_browser(pr):
+    from action_dispatch import _handle_auto_decline
+
+    gmail = MagicMock()
+    with patch("linkedin_client.ignore_invitation") as ig:
+        assert _handle_auto_decline(_REC, _profile(), pr, {"gmail": gmail}) is None
+    ig.assert_not_called()
+    gmail.trash_message.assert_not_called()
+
+
+def test_trash_failure_after_ignore_is_recorded_and_stays_created():
+    from action_dispatch import _handle_auto_decline
+
+    gmail = MagicMock()
+    gmail.trash_message.side_effect = RuntimeError("gmail down")
+    with patch("linkedin_client.ignore_invitation"):
+        result = _handle_auto_decline(_REC, _profile(), _PR, {"gmail": gmail})
 
     assert result.status == "created"
-    assert "LinkedIn ignore failed: expired" in result.error
+    assert "trash failed: gmail down" in result.error
 
 
-def test_linkedin_not_attempted_when_send_fails():
-    from action_dispatch import _handle_auto_reply
+def test_trash_disabled_skips_gmail():
+    from action_dispatch import _handle_auto_decline
 
-    gmail = _gmail()
-    gmail.send_reply.side_effect = RuntimeError("boom")
-    with patch("linkedin_client.ignore_invitation") as ignore:
-        result = _handle_auto_reply(_REC, _profile(), _PR, {"gmail": gmail})
-
-    assert result.status == "failed"
-    ignore.assert_not_called()
+    gmail = MagicMock()
+    with patch("linkedin_client.ignore_invitation"):
+        result = _handle_auto_decline(_REC, _profile(trash=False), _PR, {"gmail": gmail})
+    assert result.status == "created"
+    gmail.trash_message.assert_not_called()
 
 
-def test_linkedin_refuses_when_decline_url_equals_accept_url():
-    from action_dispatch import _handle_auto_reply
+def test_record_without_gmail_source_is_recorded_not_fatal():
+    from action_dispatch import _handle_auto_decline
 
-    pr = {**_PR, "decline_url": _PR["accept_url"]}
-    with patch("linkedin_client.ignore_invitation") as ignore:
-        result = _handle_auto_reply(_REC, _profile(), pr, {"gmail": _gmail()})
-
-    ignore.assert_not_called()
-    assert result.status == "created" and "refused" in result.error
+    with patch("linkedin_client.ignore_invitation"):
+        result = _handle_auto_decline({"id": 1}, _profile(), _PR, {"gmail": MagicMock()})
+    assert result.status == "created" and "source_ref" in result.error
 
 
-def test_linkedin_skipped_when_no_url():
-    from action_dispatch import _handle_auto_reply
+def test_action_one_decline_uses_ignore_not_task():
+    from action_dispatch import _action_one
 
-    pr = {"action": "Decline", "decline_url": ""}
-    with patch("linkedin_client.ignore_invitation") as ignore:
-        result = _handle_auto_reply(_REC, _profile(), pr, {"gmail": _gmail()})
+    gmail, todoist, llm = MagicMock(), MagicMock(), MagicMock()
+    llm.call_json.return_value = _PR
+    profile = {**_profile(), "prompt": "p {sender}"}
+    with patch("linkedin_client.ignore_invitation"):
+        result = _action_one({**_REC, "sender": "x@y.com"}, profile, llm, {"gmail": gmail, "todoist": todoist})
 
-    ignore.assert_not_called()
-    assert "no decline_url" in result.error
+    assert result.target == "linkedin_ignore"
+    todoist.create_task.assert_not_called()
 
 
-def test_load_profile_rejects_linkedin_ignore_without_url_key(tmp_path):
+def test_action_one_ignore_failure_falls_back_to_task():
+    from action_dispatch import _action_one
+
+    gmail, todoist, llm = MagicMock(), MagicMock(), MagicMock()
+    todoist.resolve_project_id.return_value = "proj"
+    todoist.create_task.return_value = "task-3"
+    llm.call_json.return_value = _PR
+    profile = {**_profile(), "prompt": "p {sender}"}
+    with patch("linkedin_client.ignore_invitation", side_effect=RuntimeError("x")):
+        result = _action_one({**_REC, "sender": "x@y.com"}, profile, llm, {"gmail": gmail, "todoist": todoist})
+
+    assert result.external_id == "task-3" and result.target is None
+    gmail.trash_message.assert_not_called()
+
+
+def test_action_one_non_decline_still_creates_task():
+    from action_dispatch import _action_one
+
+    gmail, todoist, llm = MagicMock(), MagicMock(), MagicMock()
+    todoist.resolve_project_id.return_value = "proj"
+    todoist.create_task.return_value = "task-4"
+    llm.call_json.return_value = {**_PR, "action": "Review"}
+    profile = {**_profile(), "prompt": "p {sender}"}
+    with patch("linkedin_client.ignore_invitation") as ig:
+        result = _action_one({**_REC, "sender": "x@y.com"}, profile, llm, {"gmail": gmail, "todoist": todoist})
+
+    assert result.external_id == "task-4"
+    ig.assert_not_called()
+
+
+def _load(tmp_path, auto_decline):
     import yaml
 
     from action_dispatch import _load_profile
@@ -155,139 +224,79 @@ def test_load_profile_rejects_linkedin_ignore_without_url_key(tmp_path):
         "name": "t", "target": "todoist",
         "trigger": {"sql": "SELECT cr.id FROM ContentRecords cr WHERE {{dedup}}"},
         "todoist": {"project": "P", "content": "c", "description": "d"},
-        "prompt": "p",
-        "auto_reply": {"when_key": "a", "when_value": "b", "body": "x", "linkedin_ignore": {}},
+        "prompt": "p", "auto_decline": auto_decline,
     }
     p = tmp_path / "p.yaml"
     p.write_text(yaml.dump(base))
-    with pytest.raises(ValueError, match="url_key"):
-        _load_profile(p)
+    return _load_profile(p)
 
 
-# --- LinkedIn reply channel ---------------------------------------------------
-
-_LR_PROFILE = {
-    "name": "task_connection",
-    "target": "todoist",
-    "todoist": {"project": "P", "content": "c", "description": "", "priority": 3},
-    "auto_reply": {
-        "when_key": "action", "when_value": "Decline", "body": "No thanks.\n\nJames",
-        "channel": "linkedin", "trash": True,
-        "linkedin_reply": {"url_key": "review_url", "not_url_key": "accept_url"},
-        "linkedin_ignore": {"url_key": "decline_url"},
-    },
-}
-_LR_PR = {
-    "action": "Decline",
-    "review_url": "https://www.linkedin.com/review/1",
-    "decline_url": "https://www.linkedin.com/ignore/1",
-    "accept_url": "https://www.linkedin.com/accept/1",
-}
-_LR_REC = {"id": 8, "source_type": "gmail", "source_ref": "msg-8"}
-
-
-def test_linkedin_channel_replies_then_ignores_then_trashes_in_order():
-    from action_dispatch import _handle_auto_reply
-
-    gmail, order = MagicMock(), []
-    gmail.trash_message.side_effect = lambda *_: order.append("trash")
-    with patch("linkedin_client.send_message", side_effect=lambda *a, **k: order.append("reply")) as send, \
-         patch("linkedin_client.ignore_invitation", side_effect=lambda *a, **k: order.append("ignore")):
-        result = _handle_auto_reply(_LR_REC, _LR_PROFILE, _LR_PR, {"gmail": gmail})
-
-    assert order == ["reply", "ignore", "trash"]
-    assert send.call_args.args == ("https://www.linkedin.com/review/1", "No thanks.\n\nJames")
-    gmail.trash_message.assert_called_once_with("msg-8")
-    assert result.status == "created" and result.target == "linkedin_reply" and result.error is None
-
-
-def test_linkedin_channel_reply_failure_returns_none_and_touches_nothing():
-    from action_dispatch import _handle_auto_reply
-
-    gmail = MagicMock()
-    with patch("linkedin_client.send_message", side_effect=RuntimeError("no box")), \
-         patch("linkedin_client.ignore_invitation") as ignore:
-        result = _handle_auto_reply(_LR_REC, _LR_PROFILE, _LR_PR, {"gmail": gmail})
-
-    assert result is None
-    ignore.assert_not_called()
-    gmail.trash_message.assert_not_called()
+def test_load_profile_accepts_auto_decline(tmp_path):
+    assert _load(tmp_path, _CFG)["auto_decline"]["when_value"] == "Decline"
 
 
 @pytest.mark.parametrize(
-    "pr",
+    "cfg,match",
     [
-        {**_LR_PR, "review_url": ""},
-        {**_LR_PR, "review_url": _LR_PR["accept_url"]},
+        ({k: v for k, v in _CFG.items() if k != "when_key"}, "when_key"),
+        ({k: v for k, v in _CFG.items() if k != "linkedin_ignore"}, "linkedin_ignore"),
+        ({**_CFG, "linkedin_ignore": {"url_key": "review_url"}}, "click_text"),
+        ({**_CFG, "linkedin_ignore": {"click_text": "Ignore"}}, "url_key"),
     ],
 )
-def test_linkedin_channel_bad_url_returns_none_without_opening_browser(pr):
-    from action_dispatch import _handle_auto_reply
-
-    with patch("linkedin_client.send_message") as send:
-        assert _handle_auto_reply(_LR_REC, _LR_PROFILE, pr, {"gmail": MagicMock()}) is None
-    send.assert_not_called()
+def test_load_profile_rejects_bad_auto_decline(tmp_path, cfg, match):
+    with pytest.raises(ValueError, match=match):
+        _load(tmp_path, cfg)
 
 
-def test_linkedin_channel_post_send_failures_are_recorded_not_fatal():
-    from action_dispatch import _handle_auto_reply
-
-    gmail = MagicMock()
-    gmail.trash_message.side_effect = RuntimeError("gmail down")
-    with patch("linkedin_client.send_message"), \
-         patch("linkedin_client.ignore_invitation", side_effect=RuntimeError("expired")):
-        result = _handle_auto_reply(_LR_REC, _LR_PROFILE, _LR_PR, {"gmail": gmail})
-
-    assert result.status == "created"
-    assert "LinkedIn ignore failed: expired" in result.error
-    assert "trash failed: gmail down" in result.error
-
-
-def test_action_one_linkedin_reply_failure_falls_back_to_task():
-    from action_dispatch import _action_one
-
-    todoist = MagicMock()
-    todoist.resolve_project_id.return_value = "proj"
-    todoist.create_task.return_value = "task-3"
-    llm = MagicMock()
-    llm.call_json.return_value = _LR_PR
-    profile = {**_LR_PROFILE, "prompt": "p {sender}"}
-    with patch("linkedin_client.send_message", side_effect=RuntimeError("no box")):
-        result = _action_one(
-            {**_LR_REC, "sender": "x@y.com"}, profile, llm, {"todoist": todoist, "gmail": MagicMock()}
-        )
-
-    assert result.external_id == "task-3" and result.target is None
-
-
-def test_load_profile_validates_channel(tmp_path):
+def test_load_profile_rejects_auto_decline_in_aggregate_mode(tmp_path):
     import yaml
 
     from action_dispatch import _load_profile
 
-    def load(auto_reply):
-        base = {
-            "name": "t", "target": "todoist",
-            "trigger": {"sql": "SELECT cr.id FROM ContentRecords cr WHERE {{dedup}}"},
-            "todoist": {"project": "P", "content": "c", "description": "d"},
-            "prompt": "p", "auto_reply": {"when_key": "a", "when_value": "b", "body": "x", **auto_reply},
-        }
-        p = tmp_path / "p.yaml"
-        p.write_text(yaml.dump(base))
-        return _load_profile(p)
-
-    with pytest.raises(ValueError, match="channel"):
-        load({"channel": "sms"})
-    with pytest.raises(ValueError, match="url_key"):
-        load({"channel": "linkedin"})
-    assert load({"channel": "linkedin", "linkedin_reply": {"url_key": "review_url"}})
+    base = {
+        "name": "t", "target": "todoist", "mode": "aggregate",
+        "trigger": {"sql": "SELECT cr.id FROM ContentRecords cr WHERE {{dedup}}"},
+        "todoist": {"project": "P", "content": "c", "description": "d"},
+        "prompt": "p", "auto_decline": _CFG,
+    }
+    p = tmp_path / "p.yaml"
+    p.write_text(yaml.dump(base))
+    with pytest.raises(ValueError, match="per_record"):
+        _load_profile(p)
 
 
-def test_shipped_profile_uses_linkedin_channel():
+def test_shipped_profile_ignores_via_profile_page_button():
     from pathlib import Path
 
     from action_dispatch import _load_profile
 
-    cfg = _load_profile(Path(__file__).parent.parent / "profiles" / "task_connection.yaml")["auto_reply"]
-    assert cfg["channel"] == "linkedin"
-    assert cfg["linkedin_reply"]["url_key"] == "review_url"
+    profile = _load_profile(Path(__file__).parent.parent / "profiles" / "task_connection.yaml")
+    cfg = profile["auto_decline"]
+    assert (cfg["when_key"], cfg["when_value"]) == ("action", "Decline")
+    assert cfg["linkedin_ignore"] == {
+        "url_key": "review_url", "click_text": "Ignore", "not_url_key": "accept_url"
+    }
+    assert "cr.source_ref" in profile["trigger"]["sql"]
+    assert "body" not in cfg
+
+
+def test_run_action_records_linkedin_ignore_target(tmp_path):
+    import yaml
+
+    import action_dispatch
+
+    profile_path = tmp_path / "p.yaml"
+    profile_path.write_text(yaml.dump({
+        "name": "task_connection", "target": "todoist",
+        "trigger": {"sql": "SELECT cr.id FROM ContentRecords cr WHERE {{dedup}}"},
+        "todoist": {"project": "P", "content": "c", "description": "d"},
+        "prompt": "p {sender}", "auto_decline": _CFG,
+    }))
+    llm = MagicMock()
+    llm.call_json.return_value = _PR
+    with patch.object(action_dispatch, "_query_pending_records", return_value=[{**_REC, "sender": "x"}]),          patch.object(action_dispatch, "LLMClient", return_value=llm),          patch.object(action_dispatch, "TodoistClient", return_value=MagicMock()),          patch("gmail_client.GmailClient", return_value=MagicMock()),          patch("linkedin_client.ignore_invitation"),          patch.object(action_dispatch, "_insert_action_run") as insert:
+        action_dispatch.run_action(profile_path)
+
+    assert insert.call_args.kwargs["target"] == "linkedin_ignore"
+    assert insert.call_args.kwargs["status"] == "created"
