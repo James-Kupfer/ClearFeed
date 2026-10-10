@@ -188,7 +188,7 @@ def ignore_invitation(
         config.LINKEDIN_HEADLESS if headless is None else headless,
         timeout_s or config.LINKEDIN_NAV_TIMEOUT_SECONDS,
     )
-    log.info("[linkedin] opened ignore link%s", f" and clicked {click_text!r}" if click_text else "")
+    log.info("[linkedin] opened page%s", f" and clicked {click_text!r} (button gone)" if click_text else "")
 
 
 def login() -> None:
