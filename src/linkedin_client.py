@@ -180,16 +180,20 @@ _DUMP_JS = """
 () => {
   const sel = 'button, [role=button], [role=textbox], [contenteditable=true], textarea, input[type=text]';
   const seen = new Set(), rows = [];
-  for (const el of document.querySelectorAll(sel)) {
-    const r = el.getBoundingClientRect();
-    if (!r.width || !r.height) continue;            // skip invisible
-    const label = (el.getAttribute('aria-label') || el.innerText || el.placeholder || '')
-      .replace(/\\s+/g, ' ').trim().slice(0, 80);
-    const role = el.getAttribute('role') || el.tagName.toLowerCase();
-    const row = role + ' | ' + label;
-    if (!label && role === 'div') continue;
-    if (!seen.has(row)) { seen.add(row); rows.push(row); }
-  }
+  const visit = (root) => {
+    for (const el of root.querySelectorAll(sel)) {
+      const r = el.getBoundingClientRect();
+      if (!r.width || !r.height) continue;            // skip invisible
+      const label = (el.getAttribute('aria-label') || el.innerText || el.placeholder || '')
+        .replace(/\\s+/g, ' ').trim().slice(0, 80);
+      const role = el.getAttribute('role') || el.tagName.toLowerCase();
+      if (!label && role === 'div') continue;
+      const row = (root === document ? '' : '[shadow] ') + role + ' | ' + label;
+      if (!seen.has(row)) { seen.add(row); rows.push(row); }
+    }
+    for (const el of root.querySelectorAll('*')) if (el.shadowRoot) visit(el.shadowRoot);
+  };
+  visit(document);
   return rows;
 }
 """
@@ -225,7 +229,7 @@ def inspect_page(url: str, out_path=None) -> None:
                 "\nIn the browser, click what you would click to REPLY to this person "
                 "(so a message box shows), then press Enter here... "
             )
-            page.wait_for_timeout(1000)
+            page.wait_for_timeout(2000)
             dump(page, "after your click")
         finally:
             context.close()
