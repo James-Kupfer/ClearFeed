@@ -51,7 +51,7 @@ SMTP_SENDER = "james.kupfer@gmail.com"  # From address shown on outbound digest 
 DIGEST_PDF_ENABLED = True
 DIGEST_PDF_FI_OWN_PAGE = True
 DIGEST_PDF_PAGE_WIDTH_IN = 4.41
-DIGEST_PDF_PAGE_HEIGHT_IN = 28.50   # 5x the original 5.70in — long scroll, few breaks
+DIGEST_PDF_PAGE_HEIGHT_IN = 8.00    # keep pages short: phone viewers ignore a link target's y-offset (28.50 broke Back links)
 DIGEST_PDF_MARGIN_TB_IN = 0.40   # top/bottom margin
 DIGEST_PDF_MARGIN_LR_IN = 0.20   # left/right margin
 
