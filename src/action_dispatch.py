@@ -519,6 +519,7 @@ def _ignore_on_linkedin(li_cfg: dict, prompt_result: dict) -> str | None:
     not_key = li_cfg.get("not_url_key")
     if not_key and url == str(prompt_result.get(not_key) or "").strip():
         return f"LinkedIn ignore refused: {li_cfg['url_key']} equals {not_key}"
+    log.info("[action] opening %s to click %r", url.split("?")[0], li_cfg.get("click_text"))
     try:
         from linkedin_client import ignore_invitation
         ignore_invitation(url, click_text=li_cfg.get("click_text"))
