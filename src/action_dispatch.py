@@ -46,6 +46,11 @@ YAML profile schema:
       body: |                # then trash the original message. Sent verbatim.
         ...
       trash: true            # default true
+      channel: gmail         # gmail (default) | linkedin: send the body as a LinkedIn
+      linkedin_reply:        #   message instead (for senders with no usable email address)
+        url_key: review_url  #   prompt JSON key whose page has LinkedIn's message box
+        compose_label: "Write a message"   # optional: the message box's accessible name
+        pre_click_text: null # optional: button/link to click first to open the box
       skip_addresses: ["*noreply*", "invitations@linkedin.com"]  # fnmatch, case-insensitive
       linkedin_ignore:       # optional: afterwards open the URL in prompt JSON key
         url_key: decline_url #   `url_key` in the logged-in LinkedIn browser profile
@@ -198,6 +203,13 @@ def _validate_auto_reply(profile: dict) -> None:
             raise ValueError(f"Profile auto_reply section missing required field: {field!r}")
     if not str(cfg["body"]).strip():
         raise ValueError("Profile auto_reply 'body' must not be blank")
+    channel = cfg.get("channel", "gmail")
+    if channel not in ("gmail", "linkedin"):
+        raise ValueError("Profile auto_reply 'channel' must be 'gmail' or 'linkedin'")
+    if channel == "linkedin":
+        lr = cfg.get("linkedin_reply")
+        if not isinstance(lr, dict) or not lr.get("url_key"):
+            raise ValueError("Profile auto_reply channel 'linkedin' requires linkedin_reply.url_key")
     skip = cfg.get("skip_addresses", [])
     if not isinstance(skip, list) or not all(isinstance(x, str) for x in skip):
         raise ValueError("Profile auto_reply 'skip_addresses' must be a list of strings")
@@ -565,10 +577,82 @@ def _ignore_on_linkedin(li_cfg: dict, prompt_result: dict) -> str | None:
     return None
 
 
+def _trash_original(record: dict, clients: dict) -> str | None:
+    """Trash the record's Gmail message. Returns an error string, or None on success."""
+    source_ref = record.get("source_ref")
+    if record.get("source_type") != "gmail" or not source_ref:
+        return "trash skipped: record has no Gmail source_ref (select cr.source_type, cr.source_ref)"
+    try:
+        gmail = clients.get("gmail")
+        if gmail is None:
+            from gmail_client import GmailClient
+            gmail = clients["gmail"] = GmailClient()
+        gmail.trash_message(source_ref)
+    except Exception as exc:
+        return f"trash failed: {exc}"
+    return None
+
+
+def _handle_linkedin_reply(
+    record: dict, profile: dict, prompt_result: dict, clients: dict
+) -> ActionResult | None:
+    """Reply on LinkedIn's website, then ignore the invitation and trash the email.
+
+    Returns None, having sent nothing, when the page URL is missing or the reply
+    can't be sent and confirmed — the caller then creates the normal task so the
+    request is not lost. After a confirmed send the result is 'created' and any
+    later ignore/trash failure is recorded in `error`, never retried.
+    """
+    record_id: int = record["id"]
+    cfg: dict = profile["auto_reply"]
+    opts: dict = cfg["linkedin_reply"]
+
+    url = str(prompt_result.get(opts["url_key"]) or "").strip()
+    if not url:
+        log.warning("[action] record_id=%d LinkedIn reply skipped: no %s", record_id, opts["url_key"])
+        return None
+    not_key = opts.get("not_url_key")
+    if not_key and url == str(prompt_result.get(not_key) or "").strip():
+        log.warning("[action] record_id=%d LinkedIn reply refused: %s equals %s", record_id, opts["url_key"], not_key)
+        return None
+
+    try:
+        from linkedin_client import send_message
+        send_message(
+            url,
+            str(cfg["body"]).strip(),
+            compose_label=opts.get("compose_label") or "Write a message",
+            pre_click_text=opts.get("pre_click_text"),
+        )
+    except Exception as exc:
+        log.warning("[action] record_id=%d LinkedIn reply not sent: %s", record_id, exc)
+        return None
+
+    log.info("[action] record_id=%d replied on LinkedIn", record_id)
+    errors: list[str] = []
+    li_cfg = cfg.get("linkedin_ignore")
+    if li_cfg:
+        err = _ignore_on_linkedin(li_cfg, prompt_result)
+        if err:
+            errors.append(err)
+    if cfg.get("trash", True):
+        err = _trash_original(record, clients)
+        if err:
+            errors.append(err)
+    for err in errors:
+        log.warning("[action] record_id=%d replied on LinkedIn but %s", record_id, err)
+    return ActionResult(
+        record_id, "created", error="; ".join(errors) or None, target="linkedin_reply"
+    )
+
+
 def _handle_auto_reply(
     record: dict, profile: dict, prompt_result: dict, clients: dict
 ) -> ActionResult | None:
-    """Email the profile's `auto_reply.body` to the sender, then trash the original.
+    """Reply to the sender and trash the original; dispatches on `auto_reply.channel`.
+
+    channel 'linkedin' → _handle_linkedin_reply. Otherwise (default 'gmail'):
+    email the profile's `auto_reply.body` to the sender, then trash the original.
 
     Returns None, having done nothing, when no deliverable address exists (all
     candidates are no-reply / skipped) — the caller then falls back to the
@@ -579,6 +663,9 @@ def _handle_auto_reply(
     result stays 'created' (the ActionRun dedup then prevents a second email)
     with the error recorded.
     """
+    if profile["auto_reply"].get("channel", "gmail") == "linkedin":
+        return _handle_linkedin_reply(record, profile, prompt_result, clients)
+
     record_id: int = record["id"]
     cfg: dict = profile["auto_reply"]
     source_ref = record.get("source_ref")

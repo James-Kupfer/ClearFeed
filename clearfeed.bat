@@ -9,6 +9,7 @@
 ::   clearfeed.bat reprocess --label Investment
 ::   clearfeed.bat reprocess-summary --label Investment
 ::   clearfeed.bat linkedin-login
+::   clearfeed.bat linkedin-try-reply "<invitation link>"   (types the reply, does not send)
 
 setlocal
 set PYTHONPATH=%~dp0;%~dp0src
@@ -63,6 +64,11 @@ if "%1"=="action" (
 
 if "%1"=="linkedin-login" (
     python "%~dp0src\linkedin_client.py" --login
+    goto :end
+)
+
+if "%1"=="linkedin-try-reply" (
+    python "%~dp0src\linkedin_client.py" --try-reply "%~2"
     goto :end
 )
 

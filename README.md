@@ -192,19 +192,29 @@ This must be present in `trigger.sql` — `_load_profile` rejects profiles witho
 **Auto-reply (optional, `per_record` only):** an `auto_reply:` block replaces the
 target handler for records whose prompt JSON matches. `profiles/task_connection.yaml`
 uses it so a connection request the prompt marks `action: Decline` is not turned
-into a task: ClearFeed emails the configured `body` to the sender (Reply-To, else
-From; threaded on the original) and moves the original Gmail message to Trash.
-All other actions still create tasks. If neither Reply-To nor From survives
-`skip_addresses` (LinkedIn notifications come from `invitations@linkedin.com` /
-`messages-noreply@linkedin.com`, which never reach the person), nothing is sent,
-trashed or ignored and the normal task is created instead.
+into a task. LinkedIn's notification emails come from no-reply addresses
+(`invitations@linkedin.com`, `messages-noreply@linkedin.com`), so
+`task_connection` uses `channel: linkedin`: it sends the configured `body` as a
+message on LinkedIn's website through the signed-in browser profile, then
+ignores the invitation and moves the original Gmail message to Trash. If the
+reply can't be sent and confirmed, nothing else happens and the normal task is
+created instead. All other actions still create tasks.
+
+`channel: gmail` (the default) emails the `body` to the sender (Reply-To, else
+From; threaded on the original) and trashes the original; addresses matching
+`skip_addresses` are never emailed, and if none qualifies the task is created.
 
 ```yaml
 auto_reply:
   when_key: action        # prompt JSON key to test
   when_value: Decline     # case-insensitive exact match
   trash: true             # optional, default true: trash the original message after replying
-  skip_addresses: ["*noreply*", "invitations@linkedin.com"]  # optional fnmatch globs; never reply to these
+  channel: linkedin       # gmail (default) | linkedin
+  linkedin_reply:         # channel: linkedin — send the body as a LinkedIn message
+    url_key: review_url   #   prompt JSON key whose page has the message box (https linkedin.com only)
+    compose_label: "Write a message"  # optional: message box's accessible name
+    pre_click_text: null  #   optional: button/link to click first to reveal the box
+  skip_addresses: ["*noreply*", "invitations@linkedin.com"]  # channel: gmail — never email these
   linkedin_ignore:        # optional: then open this URL in the logged-in LinkedIn browser profile
     url_key: decline_url  #   prompt JSON key holding the ignore link (must be https on linkedin.com)
     click_text: null      #   optional button/link label to click on that page
@@ -219,6 +229,12 @@ message id as `external_id`. The reply is sent once and never retried; if the
 send fails the record is marked `failed` and, like any failed ActionRun, is not
 retried automatically (see Known gaps in `system_architecture.md`). Uses the
 existing `gmail.send` / `gmail.modify` OAuth scopes — no re-consent needed.
+
+**Rehearsing the LinkedIn reply:** `clearfeed.bat linkedin-try-reply "<link>"`
+opens a visible browser on a real invitation link (e.g. the Review link in a
+notification email), types the message into LinkedIn's message box, and stops
+without sending. Use it to confirm `compose_label` / `pre_click_text` before
+relying on the automation.
 
 **LinkedIn ignore (`linkedin_ignore:`)** archives the request on LinkedIn after the
 reply and trash. LinkedIn has no API for this, so `src/linkedin_client.py` drives

@@ -52,26 +52,31 @@ todoist:
 
 # --- Auto-reply ---
 # Replaces the Todoist task: when the prompt's `action` is "Decline", ClearFeed
-# emails `body` to the sender (Reply-To, else From, unless it is in skip_addresses;
-# threaded on the original),
-# then trashes the original message in Gmail and opens the request's ignore link
-# (`decline_url` from the prompt JSON) in a logged-in LinkedIn browser profile so
-# the request is archived. No task is created for these.
-# Every other action still creates a Todoist task as above. The body is sent
-# verbatim (no {placeholders}); keep each paragraph on one line so recipients
-# don't see hard line breaks. Remove this whole block to go back to tasks only.
+# replies on LinkedIn's website (LinkedIn's notification emails come from
+# no-reply addresses, so there is no email address to reply to), opens the
+# request's ignore link (`decline_url`) so LinkedIn archives it, and trashes the
+# original Gmail message. All of this uses the signed-in browser profile
+# (`clearfeed.bat linkedin-login`). If the reply can't be sent and confirmed,
+# nothing else happens and the normal Todoist task is created instead. Every
+# other action still creates a task. The body is sent verbatim (no
+# {placeholders}); keep each paragraph on one line. Remove this block to go back
+# to tasks only. Rehearse without sending: clearfeed.bat linkedin-try-reply "<url>"
 auto_reply:
   when_key: action
   when_value: Decline
+  channel: linkedin
   trash: true
-  # Addresses a reply can never reach the person at (LinkedIn's own senders). If
-  # neither Reply-To nor From survives this list, nothing is sent, trashed or
-  # ignored and the normal Todoist task is created instead.
-  skip_addresses: ["*noreply*", "*no-reply*", "*donotreply*", "invitations@linkedin.com"]
+  linkedin_reply:
+    url_key: review_url         # page holding the message box (the requester's message/profile link)
+    not_url_key: accept_url     # never open the link if the LLM returned the accept URL here
+    compose_label: "Write a message"   # message box's accessible name; adjust if LinkedIn differs
+    pre_click_text: null        # button/link to click first if the box is hidden, e.g. "Message"
   linkedin_ignore:
     url_key: decline_url
     click_text: null            # set to the button label if opening the link alone doesn't ignore it
     not_url_key: accept_url     # never open the link if the LLM returned the accept URL here
+  # Only used if channel is switched back to gmail.
+  skip_addresses: ["*noreply*", "*no-reply*", "*donotreply*", "invitations@linkedin.com"]
   body: |
     I use an agentic system to help triage my incoming messages and connection requests. The agent decided to decline your connection request. I am not an open networker, so if you decide to resubmit your request, please include sufficient rationale as to why I should accept it.
 

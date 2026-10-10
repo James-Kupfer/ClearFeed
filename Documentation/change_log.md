@@ -1,5 +1,14 @@
 # Change Log
 
+## 2026-10-10 - Reply to declined connection requests on LinkedIn instead of by email
+
+**Type**: feature
+**Files**: src/linkedin_client.py, src/action_dispatch.py, profiles/task_connection.yaml, clearfeed.bat, tests/test_linkedin_client.py, README.md, system_architecture.md
+
+LinkedIn's notification emails have no usable return address, so `auto_reply` gains `channel: linkedin`, now used by `task_connection`. On Decline: `linkedin_client.send_message` opens the invitation's `review_url` in the signed-in browser profile, types the configured body into the message box, sends it, and confirms the composer cleared and the text appears; then the `linkedin_ignore` link is opened and the Gmail message is trashed. If the reply can't be sent and confirmed, nothing else is done and the normal Todoist task is created. After a confirmed send, ignore/trash failures are recorded in `ActionRuns.error` and not retried; `ActionRuns.target` is `linkedin_reply`. `channel: gmail` remains the default.
+
+New `clearfeed.bat linkedin-try-reply "<link>"` types the message in a visible browser without sending. The send flow was exercised only against a local stand-in page: LinkedIn's real page structure (message box name, whether a button must be clicked first, whether `review_url` lands on a replyable page) is unverified.
+
 ## 2026-10-10 - Never auto-reply to LinkedIn relay addresses
 
 **Type**: fix

@@ -69,7 +69,7 @@ writes DigestRuns   target handler;                                   │
 | `dispatch.py` | `kind: digest` | `run_dispatch`, `_load_profile`, `_resolve_bands`, `_build_prompt` | CLI / launcher |
 | `action_dispatch.py` | `kind: action` | `run_action`, `_load_profile`, `_TARGET_HANDLERS/_VALIDATORS/_CLIENTS`; `_run_aggregate` (aggregate mode) | CLI / launcher / orchestrator |
 | `gmail_client.py` (reply) | `GmailClient.get_message_headers`, `send_reply` (not retried), `trash_message` | action_dispatch (`_handle_auto_reply`) |
-| `linkedin_client.py` | Playwright persistent-profile helper: `ignore_invitation`, `validate_url`; `--login` for one-time sign-in | action_dispatch (`_ignore_on_linkedin`) |
+| `linkedin_client.py` | Playwright persistent-profile helper: `send_message`, `ignore_invitation`, `validate_url`; `--login` one-time sign-in, `--try-reply` rehearsal (types, never sends) | action_dispatch (`_handle_linkedin_reply`, `_ignore_on_linkedin`) |
 | `todoist_client.py` | Todoist REST v1 | `TodoistClient` (`resolve_project_id`, `create_task`; `_unwrap_list`) | action_dispatch |
 | `export.py` | `kind: export` | `run_export`, `_load_profile`; columns derived from SQL `cursor.description` | CLI |
 | `reprocess.py` / `reprocess_summary.py` | Re-run classify / summarize on stored records | CLI | — |
