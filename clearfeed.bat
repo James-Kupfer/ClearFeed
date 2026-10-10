@@ -3,6 +3,7 @@
 ::   clearfeed.bat ingest
 ::   clearfeed.bat ingest --dry-run
 ::   clearfeed.bat ingest --dry-run --limit 5
+::   clearfeed.bat cycle   (one full pass: token check, ingest, then the post_ingest_actions profiles)
 ::   clearfeed.bat dispatch profiles\investment_digest.yaml
 ::   clearfeed.bat action  profiles\task_connection.yaml
 ::   clearfeed.bat export  profiles\job_export.yaml
@@ -59,6 +60,11 @@ if "%1"=="action" (
         exit /b 1
     )
     python "%~dp0src\action_dispatch.py" "%~2"
+    goto :end
+)
+
+if "%1"=="cycle" (
+    python "%~dp0src\ingest_orchestrator.py" %2 %3
     goto :end
 )
 

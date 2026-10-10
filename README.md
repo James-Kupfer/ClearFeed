@@ -304,6 +304,9 @@ clearfeed.bat ingest
 :: Dispatch a digest
 clearfeed.bat dispatch profiles\digest_investment.yaml
 
+:: One full cycle, as the scheduled service runs it (token check, ingest, post-ingest actions)
+clearfeed.bat cycle
+
 :: Run an action profile (per-record tasks)
 clearfeed.bat action profiles\task_connection.yaml
 
