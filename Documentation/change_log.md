@@ -1,5 +1,12 @@
 # Change Log
 
+## 2026-10-10 - Random delay before clicking Ignore
+
+**Type**: feature
+**Files**: src/linkedin_client.py, src/action_dispatch.py, profiles/task_connection.yaml, tests/test_linkedin_client.py, README.md
+
+New optional `auto_decline.linkedin_ignore.delay_seconds: [min, max]`; `task_connection` sets `[5, 25]`. After the profile page has loaded, the browser waits a random `min..max` seconds (uniform) before clicking Ignore, and logs the wait. Interpreted as seconds. Each Decline therefore takes 5-25 s longer; declines are processed one after another within a cycle.
+
 ## 2026-10-10 - Decline = ignore on LinkedIn + trash; drop the reply
 
 **Type**: feature (supersedes the same-day auto-reply entries below)

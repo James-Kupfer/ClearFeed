@@ -207,6 +207,7 @@ auto_decline:
   linkedin_ignore:
     url_key: review_url     # prompt JSON key holding the LinkedIn page (https linkedin.com only)
     click_text: "Ignore"    # button to click; it must disappear, else the step counts as failed
+    delay_seconds: [5, 25]  # optional: wait a random min..max seconds on the page before clicking
     not_url_key: accept_url # optional: refuse if the URL equals this key's value
 ```
 

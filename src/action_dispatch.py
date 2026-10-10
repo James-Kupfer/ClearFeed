@@ -47,6 +47,7 @@ YAML profile schema:
       linkedin_ignore:       # fails or can't be confirmed, the normal task is created.
         url_key: review_url  #   prompt JSON key holding the LinkedIn page (https linkedin.com)
         click_text: "Ignore" #   button on that page to click; it must disappear afterwards
+        delay_seconds: [5, 25]  # optional: wait a random min..max seconds on the page before clicking
         not_url_key: accept_url  # optional: refuse if the URL equals this key's value
 
     system: |                # optional — static instructions, sent as the system
@@ -196,6 +197,17 @@ def _validate_auto_decline(profile: dict) -> None:
     li = cfg.get("linkedin_ignore")
     if not isinstance(li, dict) or not li.get("url_key") or not li.get("click_text"):
         raise ValueError("Profile auto_decline.linkedin_ignore requires 'url_key' and 'click_text'")
+    delay = li.get("delay_seconds")
+    if delay is not None and not (
+        isinstance(delay, list)
+        and len(delay) == 2
+        and all(isinstance(x, (int, float)) and not isinstance(x, bool) for x in delay)
+        and 0 <= delay[0] <= delay[1]
+    ):
+        raise ValueError(
+            "Profile auto_decline.linkedin_ignore 'delay_seconds' must be [min, max] "
+            "with 0 <= min <= max"
+        )
 
 
 # ------------------------------------------------------------------
@@ -522,7 +534,11 @@ def _ignore_on_linkedin(li_cfg: dict, prompt_result: dict) -> str | None:
     log.info("[action] opening %s to click %r", url.split("?")[0], li_cfg.get("click_text"))
     try:
         from linkedin_client import ignore_invitation
-        ignore_invitation(url, click_text=li_cfg.get("click_text"))
+        ignore_invitation(
+            url,
+            click_text=li_cfg.get("click_text"),
+            click_delay_seconds=li_cfg.get("delay_seconds"),
+        )
     except Exception as exc:
         return f"LinkedIn ignore failed: {exc}"
     return None

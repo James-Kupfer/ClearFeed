@@ -108,7 +108,9 @@ def test_decline_ignores_on_linkedin_then_trashes_and_never_sends_anything():
         result = _handle_auto_decline(_REC, _profile(), _PR, {"gmail": gmail})
 
     assert order == ["ignore", "trash"]
-    ig.assert_called_once_with("https://www.linkedin.com/in/someone/", click_text="Ignore")
+    ig.assert_called_once_with(
+        "https://www.linkedin.com/in/someone/", click_text="Ignore", click_delay_seconds=None
+    )
     gmail.trash_message.assert_called_once_with("msg-8")
     assert not gmail.send_reply.called and not gmail.send_message.called
     assert result.status == "created" and result.target == "linkedin_ignore" and result.error is None
@@ -275,7 +277,8 @@ def test_shipped_profile_ignores_via_profile_page_button():
     cfg = profile["auto_decline"]
     assert (cfg["when_key"], cfg["when_value"]) == ("action", "Decline")
     assert cfg["linkedin_ignore"] == {
-        "url_key": "review_url", "click_text": "Ignore", "not_url_key": "accept_url"
+        "url_key": "review_url", "click_text": "Ignore", "not_url_key": "accept_url",
+        "delay_seconds": [5, 25],
     }
     assert "cr.source_ref" in profile["trigger"]["sql"]
     assert "body" not in cfg
@@ -300,3 +303,53 @@ def test_run_action_records_linkedin_ignore_target(tmp_path):
 
     assert insert.call_args.kwargs["target"] == "linkedin_ignore"
     assert insert.call_args.kwargs["status"] == "created"
+
+
+# --- click delay ---------------------------------------------------------------
+
+
+def test_pick_delay_none_or_empty_is_zero():
+    from linkedin_client import pick_delay
+
+    assert pick_delay(None) == 0.0
+    assert pick_delay([]) == 0.0
+
+
+def test_pick_delay_stays_within_range_and_varies():
+    from linkedin_client import pick_delay
+
+    vals = [pick_delay([5, 25]) for _ in range(500)]
+    assert all(5 <= v <= 25 for v in vals)
+    assert len({round(v, 3) for v in vals}) > 100  # genuinely random, not constant
+    assert min(vals) < 8 and max(vals) > 22        # spans the range
+
+
+def test_delay_seconds_is_passed_from_profile_to_ignore_invitation():
+    from action_dispatch import _handle_auto_decline
+
+    cfg = {**_CFG["linkedin_ignore"], "delay_seconds": [5, 25]}
+    with patch("linkedin_client.ignore_invitation") as ig:
+        _handle_auto_decline(_REC, _profile(linkedin_ignore=cfg), _PR, {"gmail": MagicMock()})
+    assert ig.call_args.kwargs["click_delay_seconds"] == [5, 25]
+
+
+@pytest.mark.parametrize("bad", [[5], [25, 5], [-1, 5], "5-25", [5, "x"], [5, 25, 30], 10])
+def test_load_profile_rejects_bad_delay_seconds(tmp_path, bad):
+    cfg = {**_CFG, "linkedin_ignore": {**_CFG["linkedin_ignore"], "delay_seconds": bad}}
+    with pytest.raises(ValueError, match="delay_seconds"):
+        _load(tmp_path, cfg)
+
+
+def test_load_profile_accepts_delay_seconds(tmp_path):
+    cfg = {**_CFG, "linkedin_ignore": {**_CFG["linkedin_ignore"], "delay_seconds": [5, 25]}}
+    assert _load(tmp_path, cfg)["auto_decline"]["linkedin_ignore"]["delay_seconds"] == [5, 25]
+
+
+def test_shipped_profile_delays_5_to_25_seconds():
+    from pathlib import Path
+
+    from action_dispatch import _load_profile
+
+    li = _load_profile(Path(__file__).parent.parent / "profiles" / "task_connection.yaml")[
+        "auto_decline"]["linkedin_ignore"]
+    assert li["delay_seconds"] == [5, 25]

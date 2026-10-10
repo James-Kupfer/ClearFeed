@@ -19,6 +19,7 @@ List a page's buttons and boxes step by step (types and clicks nothing):
 import argparse
 import logging
 import os
+import random
 import sys
 from urllib.parse import urlparse
 
@@ -59,10 +60,26 @@ def _launch(p, headless: bool):
     return p.chromium.launch_persistent_context(str(config.LINKEDIN_BROWSER_PROFILE_DIR), **kwargs)
 
 
-def _visit(url: str, click_text: str | None, headless: bool, timeout_s: int) -> None:
+def pick_delay(delay_range: tuple[float, float] | list[float] | None) -> float:
+    """Random seconds in [lo, hi] for the pause before clicking; 0 when not configured."""
+    if not delay_range:
+        return 0.0
+    lo, hi = float(delay_range[0]), float(delay_range[1])
+    return random.uniform(lo, hi)
+
+
+def _visit(
+    url: str,
+    click_text: str | None,
+    headless: bool,
+    timeout_s: int,
+    click_delay_seconds: tuple[float, float] | list[float] | None = None,
+) -> None:
     """Open `url` in the persistent profile; click `click_text` if given.
 
-    Raises LinkedInError when the session is signed out or the button is absent.
+    If `click_delay_seconds` is (lo, hi), wait a random lo..hi seconds on the loaded
+    page before clicking. Raises LinkedInError when the session is signed out or
+    the button is absent.
     """
     from playwright.sync_api import Error as PlaywrightError
     from playwright.sync_api import expect, sync_playwright
@@ -85,6 +102,10 @@ def _visit(url: str, click_text: str | None, headless: bool, timeout_s: int) -> 
                 )
 
             if click_text:
+                delay = pick_delay(click_delay_seconds)
+                if delay:
+                    log.info("[linkedin] waiting %.1fs before clicking %r", delay, click_text)
+                    page.wait_for_timeout(delay * 1000)
                 target = page.get_by_role("button", name=click_text).or_(
                     page.get_by_role("link", name=click_text)
                 ).first
@@ -179,14 +200,17 @@ def ignore_invitation(
     click_text: str | None = None,
     headless: bool | None = None,
     timeout_s: int | None = None,
+    click_delay_seconds: tuple[float, float] | list[float] | None = None,
 ) -> None:
-    """Validate `url`, open it, and click `click_text` to ignore the invitation. Raises LinkedInError."""
+    """Validate `url`, open it, wait a random `click_delay_seconds` (lo, hi) if given, then
+    click `click_text` to ignore the invitation. Raises LinkedInError."""
     safe_url = validate_url(url)
     _visit(
         safe_url,
         click_text,
         config.LINKEDIN_HEADLESS if headless is None else headless,
         timeout_s or config.LINKEDIN_NAV_TIMEOUT_SECONDS,
+        click_delay_seconds,
     )
     log.info("[linkedin] opened page%s", f" and clicked {click_text!r} (button gone)" if click_text else "")
 

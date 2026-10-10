@@ -67,6 +67,7 @@ auto_decline:
   linkedin_ignore:
     url_key: review_url         # the requester's profile page, where Ignore is a button (not a link)
     click_text: "Ignore"        # button clicked on that page; the step fails if it is still there afterwards
+    delay_seconds: [5, 25]      # wait a random 5-25 seconds on the loaded page before clicking Ignore
     not_url_key: accept_url     # never open the link if the LLM returned the accept URL here
 
 # --- Prompt ---
