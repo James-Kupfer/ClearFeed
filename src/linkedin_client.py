@@ -178,30 +178,33 @@ def _reply_visit(
 
 _DUMP_JS = """
 () => {
-  const sel = 'button, [role=button], [role=textbox], [contenteditable=true], textarea, input[type=text]';
-  const seen = new Set(), rows = [];
+  const sel = 'button, [role=button], [role=menuitem], [role=option], [role=textbox], ' +
+    '[contenteditable=true], textarea, input, a[href*="messaging"]';
+  const counts = new Map();
   const visit = (root) => {
     for (const el of root.querySelectorAll(sel)) {
       const r = el.getBoundingClientRect();
       if (!r.width || !r.height) continue;            // skip invisible
-      const label = (el.getAttribute('aria-label') || el.innerText || el.placeholder || '')
-        .replace(/\\s+/g, ' ').trim().slice(0, 80);
-      const role = el.getAttribute('role') || el.tagName.toLowerCase();
+      let label = (el.getAttribute('aria-label') || el.innerText || el.placeholder ||
+                   el.getAttribute('name') || '').replace(/\\s+/g, ' ').trim().slice(0, 80);
+      const role = el.getAttribute('role') || el.tagName.toLowerCase() +
+                   (el.tagName === 'INPUT' ? '[' + (el.type || 'text') + ']' : '');
+      if (el.tagName === 'A') label += ' -> ' + (el.getAttribute('href') || '').split('?')[0].slice(0, 60);
       if (!label && role === 'div') continue;
       const row = (root === document ? '' : '[shadow] ') + role + ' | ' + label;
-      if (!seen.has(row)) { seen.add(row); rows.push(row); }
+      counts.set(row, (counts.get(row) || 0) + 1);
     }
     for (const el of root.querySelectorAll('*')) if (el.shadowRoot) visit(el.shadowRoot);
   };
   visit(document);
-  return rows;
+  return [...counts].map(([row, n]) => n > 1 ? row + '   (x' + n + ')' : row);
 }
 """
 
 
 def inspect_page(url: str, out_path=None) -> None:
-    """Visible browser: list the page's visible buttons / text boxes, let the user
-    click their reply control, then list again. Output also goes to `out_path`.
+    """Visible browser: list the page's visible controls, then again after each step
+    the user performs by hand (More -> Message ...). Output also goes to `out_path`.
     Nothing is typed or sent."""
     from playwright.sync_api import sync_playwright
 
@@ -225,12 +228,17 @@ def inspect_page(url: str, out_path=None) -> None:
             page.wait_for_load_state("load")
             page.wait_for_timeout(3000)  # let LinkedIn's client-side render finish
             dump(page, "initial page")
-            input(
-                "\nIn the browser, click what you would click to REPLY to this person "
-                "(so a message box shows), then press Enter here... "
-            )
-            page.wait_for_timeout(2000)
-            dump(page, "after your click")
+            step = 0
+            while True:
+                answer = input(
+                    "\nIn the browser do the NEXT step toward replying (do not send), then press "
+                    "Enter to list the page. Type q + Enter when the message box is showing... "
+                )
+                if answer.strip().lower() == "q":
+                    break
+                step += 1
+                page.wait_for_timeout(2000)
+                dump(page, f"after step {step}")
         finally:
             context.close()
     if out_path:
