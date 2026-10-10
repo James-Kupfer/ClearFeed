@@ -53,7 +53,9 @@ todoist:
 # --- Auto-reply ---
 # Replaces the Todoist task: when the prompt's `action` is "Decline", ClearFeed
 # emails `body` to the sender (Reply-To, else From; threaded on the original),
-# then trashes the original message in Gmail. No task is created for these.
+# then trashes the original message in Gmail and opens the request's ignore link
+# (`decline_url` from the prompt JSON) in a logged-in LinkedIn browser profile so
+# the request is archived. No task is created for these.
 # Every other action still creates a Todoist task as above. The body is sent
 # verbatim (no {placeholders}); keep each paragraph on one line so recipients
 # don't see hard line breaks. Remove this whole block to go back to tasks only.
@@ -61,6 +63,10 @@ auto_reply:
   when_key: action
   when_value: Decline
   trash: true
+  linkedin_ignore:
+    url_key: decline_url
+    click_text: null            # set to the button label if opening the link alone doesn't ignore it
+    not_url_key: accept_url     # never open the link if the LLM returned the accept URL here
   body: |
     I use an agentic system to help triage my incoming messages and connection requests. The agent decided to decline your connection request. I am not an open networker, so if you decide to resubmit your request, please include sufficient rationale as to why I should accept it.
 

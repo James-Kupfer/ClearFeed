@@ -1,5 +1,14 @@
 # Change Log
 
+## 2026-10-10 - Ignore declined connection requests on LinkedIn
+
+**Type**: feature
+**Files**: src/linkedin_client.py, src/action_dispatch.py, src/config.py, profiles/task_connection.yaml, clearfeed.bat, requirements.txt, .gitignore, tests/test_linkedin_client.py, README.md, system_architecture.md
+
+After the decline reply is sent and the email trashed, `task_connection` opens the request's `decline_url` in a persistent, signed-in Playwright Chromium profile so LinkedIn archives it. New optional `auto_reply.linkedin_ignore` block (`url_key`, `click_text`, `not_url_key`). Sign in once with `clearfeed.bat linkedin-login`.
+
+Only https `linkedin.com` URLs are opened (the URL is LLM-extracted from an email body), and the step is refused if `decline_url` equals `accept_url`. A signed-out session is detected and reported. Failures are recorded in `ActionRuns.error`, not retried, and leave the status `created` because the reply already went out. Verified against a local stand-in page only, not LinkedIn; LinkedIn's terms prohibit automation.
+
 ## 2026-10-10 - Auto-reply to and trash declined connection requests
 
 **Type**: feature

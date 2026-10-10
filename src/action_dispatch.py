@@ -46,6 +46,10 @@ YAML profile schema:
       body: |                # then trash the original message. Sent verbatim.
         ...
       trash: true            # default true
+      linkedin_ignore:       # optional: afterwards open the URL in prompt JSON key
+        url_key: decline_url #   `url_key` in the logged-in LinkedIn browser profile
+        click_text: null     #   optional button/link label to click on that page
+        not_url_key: accept_url  # optional: refuse if the URL equals this key's value
 
     system: |                # optional — static instructions, sent as the system
       ...                    # turn with prompt caching. Must contain NO {placeholders}
@@ -193,6 +197,10 @@ def _validate_auto_reply(profile: dict) -> None:
             raise ValueError(f"Profile auto_reply section missing required field: {field!r}")
     if not str(cfg["body"]).strip():
         raise ValueError("Profile auto_reply 'body' must not be blank")
+    if "linkedin_ignore" in cfg:
+        li = cfg["linkedin_ignore"]
+        if not isinstance(li, dict) or not li.get("url_key"):
+            raise ValueError("Profile auto_reply.linkedin_ignore requires 'url_key'")
 
 
 # ------------------------------------------------------------------
@@ -520,14 +528,35 @@ def _reply_address(headers: dict) -> str | None:
     return None
 
 
+def _ignore_on_linkedin(li_cfg: dict, prompt_result: dict) -> str | None:
+    """Open the invitation's ignore link in the LinkedIn browser profile.
+
+    Returns an error string, or None on success. Never raises: by this point the
+    reply is already sent, so a failure here is recorded, not retried.
+    """
+    url = str(prompt_result.get(li_cfg["url_key"]) or "").strip()
+    if not url:
+        return f"LinkedIn ignore skipped: prompt returned no {li_cfg['url_key']}"
+    not_key = li_cfg.get("not_url_key")
+    if not_key and url == str(prompt_result.get(not_key) or "").strip():
+        return f"LinkedIn ignore refused: {li_cfg['url_key']} equals {not_key}"
+    try:
+        from linkedin_client import ignore_invitation
+        ignore_invitation(url, click_text=li_cfg.get("click_text"))
+    except Exception as exc:
+        return f"LinkedIn ignore failed: {exc}"
+    return None
+
+
 def _handle_auto_reply(
     record: dict, profile: dict, prompt_result: dict, clients: dict
 ) -> ActionResult:
     """Email the profile's `auto_reply.body` to the sender, then trash the original.
 
-    Send happens first; the trash only runs after a successful send. If the
-    trash fails the reply has already gone out, so the result stays 'created'
-    (the ActionRun dedup then prevents a second email) with the error recorded.
+    Send happens first; the trash and the optional LinkedIn ignore only run after
+    a successful send. If either fails the reply has already gone out, so the
+    result stays 'created' (the ActionRun dedup then prevents a second email)
+    with the error recorded.
     """
     record_id: int = record["id"]
     cfg: dict = profile["auto_reply"]
@@ -583,6 +612,14 @@ def _handle_auto_reply(
             log.warning("[action] record_id=%d %s", record_id, error)
 
     log.info("[action] record_id=%d auto-replied to %s (sent_id=%s)", record_id, to, sent_id)
+
+    li_cfg = cfg.get("linkedin_ignore")
+    if li_cfg:
+        li_error = _ignore_on_linkedin(li_cfg, prompt_result)
+        if li_error:
+            log.warning("[action] record_id=%d %s", record_id, li_error)
+            error = f"{error}; {li_error}" if error else li_error
+
     return ActionResult(
         record_id, "created", external_id=sent_id, error=error, target=_AUTO_REPLY_TARGET
     )

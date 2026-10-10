@@ -201,6 +201,10 @@ auto_reply:
   when_key: action        # prompt JSON key to test
   when_value: Decline     # case-insensitive exact match
   trash: true             # optional, default true: trash the original message after replying
+  linkedin_ignore:        # optional: then open this URL in the logged-in LinkedIn browser profile
+    url_key: decline_url  #   prompt JSON key holding the ignore link (must be https on linkedin.com)
+    click_text: null      #   optional button/link label to click on that page
+    not_url_key: accept_url  # optional: never open the link if it equals this key's value
   body: |                 # sent verbatim as plain text — no {placeholders}
     ...
 ```
@@ -211,6 +215,19 @@ message id as `external_id`. The reply is sent once and never retried; if the
 send fails the record is marked `failed` and, like any failed ActionRun, is not
 retried automatically (see Known gaps in `system_architecture.md`). Uses the
 existing `gmail.send` / `gmail.modify` OAuth scopes — no re-consent needed.
+
+**LinkedIn ignore (`linkedin_ignore:`)** archives the request on LinkedIn after the
+reply and trash. LinkedIn has no API for this, so `src/linkedin_client.py` drives
+a persistent Chromium profile (`config.LINKEDIN_BROWSER_PROFILE_DIR`, gitignored)
+with Playwright. One-time setup: `pip install -r requirements.txt`,
+`playwright install chromium`, then `clearfeed.bat linkedin-login` and sign in.
+It only opens https `linkedin.com` URLs, and reports a signed-out session instead
+of silently doing nothing. Automating LinkedIn violates its terms and can get the
+account restricted. The click behavior was tested only against a local stand-in
+page, not LinkedIn: if opening the link alone doesn't archive the request, set
+`click_text` to the button's label. Failures here are recorded in
+`ActionRuns.error` and not retried; the status stays `created` because the reply
+already went out.
 
 **Record column names** in `content`/`description` come directly from the SQL `SELECT` column aliases — no separate `inputs:` list. `{placeholders}` also include prompt JSON keys (prompt wins on collision).
 

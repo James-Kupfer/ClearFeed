@@ -69,6 +69,7 @@ writes DigestRuns   target handler;                                   │
 | `dispatch.py` | `kind: digest` | `run_dispatch`, `_load_profile`, `_resolve_bands`, `_build_prompt` | CLI / launcher |
 | `action_dispatch.py` | `kind: action` | `run_action`, `_load_profile`, `_TARGET_HANDLERS/_VALIDATORS/_CLIENTS`; `_run_aggregate` (aggregate mode) | CLI / launcher / orchestrator |
 | `gmail_client.py` (reply) | `GmailClient.get_message_headers`, `send_reply` (not retried), `trash_message` | action_dispatch (`_handle_auto_reply`) |
+| `linkedin_client.py` | Playwright persistent-profile helper: `ignore_invitation`, `validate_url`; `--login` for one-time sign-in | action_dispatch (`_ignore_on_linkedin`) |
 | `todoist_client.py` | Todoist REST v1 | `TodoistClient` (`resolve_project_id`, `create_task`; `_unwrap_list`) | action_dispatch |
 | `export.py` | `kind: export` | `run_export`, `_load_profile`; columns derived from SQL `cursor.description` | CLI |
 | `reprocess.py` / `reprocess_summary.py` | Re-run classify / summarize on stored records | CLI | — |
@@ -140,6 +141,7 @@ prompt — the two action-digest profiles each carry their own copy.)
 |--------|-------|---------------|
 | Gmail | `gmail_client.py` (API read/label/trash + SMTP send) | OAuth client secret + token cache; app password — in `LLM_Config/shared/google/` |
 | Anthropic | `llm_client.py` | `ANTHROPIC_API_KEY` (via `security_config.py`) |
+| LinkedIn (browser) | `linkedin_client.py` — Playwright, persistent Chromium profile at `config.LINKEDIN_BROWSER_PROFILE_DIR` | Your own signed-in session (cookies in the gitignored profile dir); no API key |
 | Todoist | `todoist_client.py` — REST **v1** (`config.TODOIST_BASE_URL`). Responses may be wrapped `{"results": [...]}`; `_unwrap_list` normalizes both bare lists and envelopes. Missing projects are auto-created. | `TODOIST_API_TOKEN` (via `security_config.py`) |
 | PostgreSQL | `db.py` (`localhost:5432`, DB `clearfeed`) | host/port/name/user in `config.py`; `DB_PASSWORD` in `security_config.py` |
 

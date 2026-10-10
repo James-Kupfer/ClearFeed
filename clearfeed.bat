@@ -8,6 +8,7 @@
 ::   clearfeed.bat export  profiles\job_export.yaml
 ::   clearfeed.bat reprocess --label Investment
 ::   clearfeed.bat reprocess-summary --label Investment
+::   clearfeed.bat linkedin-login
 
 setlocal
 set PYTHONPATH=%~dp0;%~dp0src
@@ -57,6 +58,11 @@ if "%1"=="action" (
         exit /b 1
     )
     python "%~dp0src\action_dispatch.py" "%~2"
+    goto :end
+)
+
+if "%1"=="linkedin-login" (
+    python "%~dp0src\linkedin_client.py" --login
     goto :end
 )
 
