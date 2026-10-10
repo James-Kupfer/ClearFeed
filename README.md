@@ -189,6 +189,29 @@ This must be present in `trigger.sql` — `_load_profile` rejects profiles witho
 
 **`priority` in `todoist:` blocks** uses the **human scale (1 = most urgent, 4 = normal)**. `todoist_client.py` inverts it to the Todoist REST API scale (`api_priority = 5 − human_priority`) at the point the request is built. Profiles and prompts never need to express the REST scale.
 
+**Auto-reply (optional, `per_record` only):** an `auto_reply:` block replaces the
+target handler for records whose prompt JSON matches. `profiles/task_connection.yaml`
+uses it so a connection request the prompt marks `action: Decline` is not turned
+into a task: ClearFeed emails the configured `body` to the sender (Reply-To, else
+From; threaded on the original) and moves the original Gmail message to Trash.
+All other actions still create tasks.
+
+```yaml
+auto_reply:
+  when_key: action        # prompt JSON key to test
+  when_value: Decline     # case-insensitive exact match
+  trash: true             # optional, default true: trash the original message after replying
+  body: |                 # sent verbatim as plain text — no {placeholders}
+    ...
+```
+
+The trigger SQL must select `cr.source_type` and `cr.source_ref` (the Gmail
+message id). The `ActionRuns` row records `target = gmail_reply` and the sent
+message id as `external_id`. The reply is sent once and never retried; if the
+send fails the record is marked `failed` and, like any failed ActionRun, is not
+retried automatically (see Known gaps in `system_architecture.md`). Uses the
+existing `gmail.send` / `gmail.modify` OAuth scopes — no re-consent needed.
+
 **Record column names** in `content`/`description` come directly from the SQL `SELECT` column aliases — no separate `inputs:` list. `{placeholders}` also include prompt JSON keys (prompt wins on collision).
 
 ### Export profile (`kind: export`)

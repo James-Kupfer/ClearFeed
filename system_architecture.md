@@ -68,6 +68,7 @@ writes DigestRuns   target handler;                                   │
 | `digest_orchestrator.py` | runs every profile listed in `orchestration/digest.yaml` via `run_dispatch` | — | manual (`python src/digest_orchestrator.py`); not currently wired to a scheduled task |
 | `dispatch.py` | `kind: digest` | `run_dispatch`, `_load_profile`, `_resolve_bands`, `_build_prompt` | CLI / launcher |
 | `action_dispatch.py` | `kind: action` | `run_action`, `_load_profile`, `_TARGET_HANDLERS/_VALIDATORS/_CLIENTS`; `_run_aggregate` (aggregate mode) | CLI / launcher / orchestrator |
+| `gmail_client.py` (reply) | `GmailClient.get_message_headers`, `send_reply` (not retried), `trash_message` | action_dispatch (`_handle_auto_reply`) |
 | `todoist_client.py` | Todoist REST v1 | `TodoistClient` (`resolve_project_id`, `create_task`; `_unwrap_list`) | action_dispatch |
 | `export.py` | `kind: export` | `run_export`, `_load_profile`; columns derived from SQL `cursor.description` | CLI |
 | `reprocess.py` / `reprocess_summary.py` | Re-run classify / summarize on stored records | CLI | — |
@@ -121,6 +122,7 @@ prompt — the two action-digest profiles each carry their own copy.)
 | **Add an export** | New `profiles/<name>.yaml` (`kind: export`) with a `sql:` key. Column headers come from the SQL `SELECT` aliases. No code. |
 | **Add an action (existing target)** | New `profiles/<name>.yaml` (`kind: action`, `target: todoist`). SQL in `trigger.sql` must contain `{{dedup}}`. Add to `orchestration/ingest.yaml` `post_ingest_actions` and/or a task XML. No code. |
 | **Add an aggregate action** | Same as above but add `mode: aggregate`. Prompt receives `{records_json}` and `{prior_actions_json}`; must return `{"actions": [...]}` with `record_ids`. Set `trigger.prior_actions_hours` to control lookback for prior-action context. |
+| **Auto-reply and trash instead of a task** | Add an `auto_reply:` block (`when_key`, `when_value`, `body`, optional `trash`) to a `per_record` action profile and select `cr.source_type, cr.source_ref` in `trigger.sql`. `action_dispatch._action_one` routes matching records to `_handle_auto_reply` instead of the target handler. See `profiles/task_connection.yaml`. |
 | **Add an action target (e.g. Playwright)** | In `action_dispatch.py`: write `_handle_playwright(record, profile, prompt_result, clients)` returning `ActionResult`; write `_validate_playwright(cfg)`; register both in `_TARGET_HANDLERS` / `_TARGET_VALIDATORS`; if it needs a client, add a factory to `_TARGET_CLIENTS`. Profiles then use `target: playwright` + a `playwright:` config block. **Pipeline, launchers, and tasks are untouched.** |
 | **Expose new ContentRecord columns to action prompts** | Add the column to the `SELECT` list in the profile's `trigger.sql`. No code. |
 | **Expose new ContentRecord columns to digest LLM** | Add the column to the `SELECT` in the profile's `sql:` band. Render it in `dispatch._build_prompt` only if it needs special formatting beyond the default row rendering. |
@@ -185,3 +187,10 @@ secrets from. `security_config.py` itself sources the actual values from a
   one-off blip no longer causes this, but an outage longer than the retry window
   (`LLM_RETRY_ATTEMPTS`, `LLM_RETRY_BASE_DELAY`) still does. To retry, delete the
   row from `ActionRuns` where `profile_name = '<profile>' AND record_id = <id>`.
+- **Auto-reply failures are not retried and leave no task.** A declined
+  connection request whose reply fails to send gets a `failed` ActionRun (so no
+  second attempt) and no Todoist task; delete the row to retry. The send itself
+  is never retried inside one run, to avoid emailing a stranger twice.
+- **Auto-reply recipient is the message's Reply-To, else From.** For notification
+  mail such as LinkedIn's, that address may be a no-reply or relay address
+  rather than the person; verify against a real decline before relying on it.

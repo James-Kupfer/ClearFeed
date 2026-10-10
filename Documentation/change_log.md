@@ -1,5 +1,16 @@
 # Change Log
 
+## 2026-10-10 - Auto-reply to and trash declined connection requests
+
+**Type**: feature
+**Files**: src/action_dispatch.py, src/gmail_client.py, profiles/task_connection.yaml, tests/test_action_dispatch.py, tests/test_gmail_reply.py, README.md, system_architecture.md
+
+`task_connection` no longer creates a Todoist task when the prompt's `action` is `Decline`. Instead ClearFeed emails the sender a configurable message (`auto_reply.body` in the profile) as a threaded reply, then moves the original Gmail message to Trash. Other actions (Accept, Review, Respond, Meeting) are unchanged.
+
+New generic `auto_reply:` profile block (per_record mode only) routes matching records to `_handle_auto_reply` in place of the target handler. `ActionRuns.target` is `gmail_reply` for these rows. The trash is message-level (`GmailClient.trash_message`), not thread-level, so the sent reply is not trashed with it. `GmailClient.send_reply` is deliberately not retried. If the send succeeds but the trash fails, the record stays `created` with the error recorded, so it is never re-sent.
+
+Header values are collapsed to one line before use to block header injection from a hostile subject or Message-ID. The Decline Message block inside the `task_connection` LLM prompt is now unused by this path and was left as is.
+
 ## 2026-10-07 - Retry transient Todoist errors; strip NUL bytes before insert
 
 **Type**: fix

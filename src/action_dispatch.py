@@ -40,6 +40,13 @@ YAML profile schema:
       due_string: null
       content: "Respond to {name}"   # {placeholders} resolved
 
+    auto_reply:              # optional, per_record only: replaces the target handler
+      when_key: action       # when the prompt JSON's `action` equals `when_value`,
+      when_value: Decline    # email `body` to the sender instead of creating a task,
+      body: |                # then trash the original message. Sent verbatim.
+        ...
+      trash: true            # default true
+
     system: |                # optional — static instructions, sent as the system
       ...                    # turn with prompt caching. Must contain NO {placeholders}
                               # (repeat calls only cache-hit if this text is byte-identical
@@ -99,6 +106,7 @@ class ActionResult:
     external_id: str | None = None
     error: str | None = None
     action_content: str | None = None  # aggregate mode: JSON of the action object
+    target: str | None = None  # overrides the profile's target in ActionRuns (e.g. auto-reply)
 
 
 # ------------------------------------------------------------------
@@ -167,7 +175,24 @@ def _load_profile(path: Path) -> dict:
     if validator is not None:
         validator(profile[target])
 
+    if "auto_reply" in profile:
+        _validate_auto_reply(profile)
+
     return profile
+
+
+def _validate_auto_reply(profile: dict) -> None:
+    """Validate the optional `auto_reply:` block."""
+    if profile.get("mode", "per_record") != "per_record":
+        raise ValueError("'auto_reply' is only supported with mode: per_record")
+    cfg = profile["auto_reply"]
+    if not isinstance(cfg, dict):
+        raise ValueError("Profile 'auto_reply' must be a mapping")
+    for field in ("when_key", "when_value", "body"):
+        if not cfg.get(field):
+            raise ValueError(f"Profile auto_reply section missing required field: {field!r}")
+    if not str(cfg["body"]).strip():
+        raise ValueError("Profile auto_reply 'body' must not be blank")
 
 
 # ------------------------------------------------------------------
@@ -351,6 +376,9 @@ def _action_one(
 
     log.info("[action] %s prompt result keys: %s", context, list(prompt_result.keys()))
 
+    if _auto_reply_matches(profile, prompt_result):
+        return _handle_auto_reply(record, profile, prompt_result, clients)
+
     handler = _TARGET_HANDLERS[profile["target"]]
     return handler(record, profile, prompt_result, clients)
 
@@ -453,6 +481,111 @@ def _handle_playwright(
     routine with `prompt_result` + record fields, then return an ActionResult.
     """
     raise NotImplementedError("playwright target not yet implemented")
+
+
+# ------------------------------------------------------------------
+# Auto-reply — replaces the target handler for records the prompt marks
+# (e.g. action == "Decline"): email the sender, then trash the original.
+# ------------------------------------------------------------------
+
+_AUTO_REPLY_TARGET = "gmail_reply"
+
+
+def _auto_reply_matches(profile: dict, prompt_result: dict) -> bool:
+    """True when the profile has an `auto_reply` block and the prompt JSON triggers it."""
+    cfg = profile.get("auto_reply")
+    if not cfg:
+        return False
+    actual = prompt_result.get(cfg["when_key"])
+    if actual is None:
+        return False
+    return str(actual).strip().lower() == str(cfg["when_value"]).strip().lower()
+
+
+def _single_line(value: str) -> str:
+    """Collapse all whitespace (incl. CR/LF) so a header value cannot inject headers."""
+    return " ".join(str(value).split())
+
+
+def _reply_address(headers: dict) -> str | None:
+    """Bare address to reply to: Reply-To if present, else From. None if unusable."""
+    from email.utils import parseaddr
+    for name in ("reply-to", "from"):
+        raw = headers.get(name)
+        if not raw:
+            continue
+        _, addr = parseaddr(_single_line(raw))
+        if addr and "@" in addr and not any(c.isspace() for c in addr):
+            return addr
+    return None
+
+
+def _handle_auto_reply(
+    record: dict, profile: dict, prompt_result: dict, clients: dict
+) -> ActionResult:
+    """Email the profile's `auto_reply.body` to the sender, then trash the original.
+
+    Send happens first; the trash only runs after a successful send. If the
+    trash fails the reply has already gone out, so the result stays 'created'
+    (the ActionRun dedup then prevents a second email) with the error recorded.
+    """
+    record_id: int = record["id"]
+    cfg: dict = profile["auto_reply"]
+    source_ref = record.get("source_ref")
+
+    def _fail(msg: str) -> ActionResult:
+        return ActionResult(record_id, "failed", error=msg, target=_AUTO_REPLY_TARGET)
+
+    if record.get("source_type") != "gmail" or not source_ref:
+        return _fail(
+            "Auto-reply needs a Gmail record: add cr.source_type and cr.source_ref "
+            "to the trigger SQL SELECT"
+        )
+
+    try:
+        gmail = clients.get("gmail")
+        if gmail is None:
+            from gmail_client import GmailClient
+            gmail = clients["gmail"] = GmailClient()
+        meta = gmail.get_message_headers(source_ref)
+    except Exception as exc:
+        return _fail(f"Gmail error reading message {source_ref}: {exc}")
+
+    headers: dict = meta.get("headers") or {}
+    to = _reply_address(headers)
+    if not to:
+        return _fail(f"No usable reply address in message {source_ref}")
+
+    subject = _single_line(headers.get("subject", ""))
+    if not subject.lower().startswith("re:"):
+        subject = f"Re: {subject}".strip()
+    in_reply_to = _single_line(headers.get("message-id", "")) or None
+    references = _single_line(headers.get("references", "")) or None
+
+    try:
+        sent_id = gmail.send_reply(
+            to=to,
+            subject=subject,
+            body=str(cfg["body"]).strip(),
+            thread_id=meta.get("thread_id"),
+            in_reply_to=in_reply_to,
+            references=references,
+        )
+    except Exception as exc:
+        return _fail(f"Gmail send error: {exc}")
+
+    error: str | None = None
+    if cfg.get("trash", True):
+        try:
+            gmail.trash_message(source_ref)
+        except Exception as exc:
+            error = f"Replied (sent_id={sent_id}) but trash failed: {exc}"
+            log.warning("[action] record_id=%d %s", record_id, error)
+
+    log.info("[action] record_id=%d auto-replied to %s (sent_id=%s)", record_id, to, sent_id)
+    return ActionResult(
+        record_id, "created", external_id=sent_id, error=error, target=_AUTO_REPLY_TARGET
+    )
 
 
 # target name → (handler, validator). Adding a capability = add one row.
@@ -658,7 +791,7 @@ def run_action(profile_path: str | Path) -> list[ActionResult]:
             _insert_action_run(
                 profile_name=profile_name,
                 record_id=result.record_id,
-                target=target,
+                target=result.target or target,
                 external_id=result.external_id,
                 status=result.status,
                 error=result.error,
@@ -669,6 +802,8 @@ def run_action(profile_path: str | Path) -> list[ActionResult]:
 
         if result.status == "failed":
             log.error("Record %d: %s", result.record_id, result.error)
+        elif result.error:
+            log.warning("Record %d → %s with error: %s", result.record_id, result.status, result.error)
         else:
             log.info(
                 "Record %d → %s (task_id=%s)",

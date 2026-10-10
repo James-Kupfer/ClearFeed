@@ -320,6 +320,73 @@ class GmailClient:
         """Move a thread to Gmail Trash. Recoverable for 30 days; not a permanent delete."""
         self._service.users().threads().trash(userId="me", id=thread_id).execute()
 
+    @retry(exceptions=(HttpError,))
+    def trash_message(self, message_id: str) -> None:
+        """Move a single message to Gmail Trash (recoverable for 30 days).
+
+        Message-level, unlike trash_thread: a reply sent into the same thread is
+        left alone. Trashing an already-trashed message is a no-op.
+        """
+        self._service.users().messages().trash(userId="me", id=message_id).execute()
+
+    # ------------------------------------------------------------------
+    # Reply
+    # ------------------------------------------------------------------
+
+    @retry(exceptions=(HttpError,))
+    def get_message_headers(self, message_id: str) -> dict:
+        """Fetch the headers needed to reply to a message.
+
+        Returns:
+            {"thread_id": str | None, "headers": {lowercased name: value}} for
+            From, Reply-To, Subject, Message-ID and References.
+        """
+        msg = (
+            self._service.users()
+            .messages()
+            .get(
+                userId="me",
+                id=message_id,
+                format="metadata",
+                metadataHeaders=["From", "Reply-To", "Subject", "Message-ID", "References"],
+            )
+            .execute()
+        )
+        headers = {
+            h["name"].lower(): h["value"]
+            for h in msg.get("payload", {}).get("headers", [])
+        }
+        return {"thread_id": msg.get("threadId"), "headers": headers}
+
+    def send_reply(
+        self,
+        to: str,
+        subject: str,
+        body: str,
+        thread_id: str | None = None,
+        in_reply_to: str | None = None,
+        references: str | None = None,
+    ) -> str:
+        """Send a plain-text reply and return the sent message's Gmail ID.
+
+        Deliberately NOT retried: a retry after a 5xx that was in fact delivered
+        would email a stranger twice, which is worse than one failed attempt.
+        """
+        msg = MIMEText(body, "plain", "utf-8")
+        msg["To"] = to
+        msg["From"] = config.SMTP_SENDER
+        msg["Subject"] = subject
+        if in_reply_to:
+            msg["In-Reply-To"] = in_reply_to
+            msg["References"] = f"{references} {in_reply_to}".strip() if references else in_reply_to
+
+        payload: dict = {"raw": base64.urlsafe_b64encode(msg.as_bytes()).decode()}
+        if thread_id:
+            payload["threadId"] = thread_id
+        sent = self._service.users().messages().send(userId="me", body=payload).execute()
+        log.info("Sent reply to %s: %s", to, subject)
+        return sent["id"]
+
 
 # ------------------------------------------------------------------
 # SMTP outbound (dispatch)
