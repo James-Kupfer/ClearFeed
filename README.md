@@ -230,9 +230,9 @@ send fails the record is marked `failed` and, like any failed ActionRun, is not
 retried automatically (see Known gaps in `system_architecture.md`). Uses the
 existing `gmail.send` / `gmail.modify` OAuth scopes — no re-consent needed.
 
-**Rehearsing the LinkedIn reply:** `clearfeed.bat linkedin-try-reply "<link>"`
-opens a visible browser on a real invitation link (e.g. the Review link in a
-notification email), types the message into LinkedIn's message box, and stops
+**Rehearsing the LinkedIn reply:** `clearfeed.bat linkedin-try-reply`
+prompts for a real invitation link (e.g. the Review link in a notification
+email; pasting at the prompt avoids cmd.exe mangling `&` in the URL), opens a visible browser on it, types the message into LinkedIn's message box, and stops
 without sending. Use it to confirm `compose_label` / `pre_click_text` before
 relying on the automation.
 

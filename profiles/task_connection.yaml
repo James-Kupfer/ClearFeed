@@ -60,7 +60,7 @@ todoist:
 # nothing else happens and the normal Todoist task is created instead. Every
 # other action still creates a task. The body is sent verbatim (no
 # {placeholders}); keep each paragraph on one line. Remove this block to go back
-# to tasks only. Rehearse without sending: clearfeed.bat linkedin-try-reply "<url>"
+# to tasks only. Rehearse without sending: clearfeed.bat linkedin-try-reply
 auto_reply:
   when_key: action
   when_value: Decline

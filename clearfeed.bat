@@ -9,7 +9,7 @@
 ::   clearfeed.bat reprocess --label Investment
 ::   clearfeed.bat reprocess-summary --label Investment
 ::   clearfeed.bat linkedin-login
-::   clearfeed.bat linkedin-try-reply "<invitation link>"   (types the reply, does not send)
+::   clearfeed.bat linkedin-try-reply   (prompts for an invitation link; types the reply, does not send)
 
 setlocal
 set PYTHONPATH=%~dp0;%~dp0src
@@ -26,11 +26,11 @@ if "%1"=="ingest" (
 )
 
 if "%1"=="dispatch" (
-    if "%2"=="" (
+    if "%~2"=="" (
         echo dispatch requires a profile path, e.g.: clearfeed.bat dispatch profiles\investment_digest.yaml
         exit /b 1
     )
-    python "%~dp0src\dispatch.py" "%2"
+    python "%~dp0src\dispatch.py" "%~2"
     goto :end
 )
 
@@ -68,7 +68,11 @@ if "%1"=="linkedin-login" (
 )
 
 if "%1"=="linkedin-try-reply" (
-    python "%~dp0src\linkedin_client.py" --try-reply "%~2"
+    if "%~2"=="" (
+        python "%~dp0src\linkedin_client.py" --try-reply
+    ) else (
+        python "%~dp0src\linkedin_client.py" --try-reply "%~2"
+    )
     goto :end
 )
 

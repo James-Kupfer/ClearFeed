@@ -228,8 +228,11 @@ if __name__ == "__main__":
     parser.add_argument("--login", action="store_true", help="sign in once (visible browser)")
     parser.add_argument(
         "--try-reply",
+        nargs="?",
+        const="",
         metavar="URL",
-        help="rehearse the reply on a real invitation link: type the message, do NOT send",
+        help="rehearse the reply on a real invitation link (prompts if omitted): "
+        "type the message, do NOT send",
     )
     parser.add_argument(
         "--profile", default="profiles/task_connection.yaml", help="profile supplying the message"
@@ -237,14 +240,17 @@ if __name__ == "__main__":
     args = parser.parse_args()
     if args.login:
         login()
-    elif args.try_reply:
+    elif args.try_reply is not None:
         from utils import read_yaml_profile
+
+        # Pasting at a prompt avoids cmd.exe mangling '&' and '%' in LinkedIn links.
+        try_url = args.try_reply.strip() or input("Paste the invitation link, then press Enter: ").strip()
 
         prof = read_yaml_profile(config.BASE_DIR / args.profile)
         cfg = prof["auto_reply"]
         opts = cfg.get("linkedin_reply", {})
         _reply_visit(
-            validate_url(args.try_reply),
+            validate_url(try_url),
             str(cfg["body"]).strip(),
             opts.get("compose_label", "Write a message"),
             opts.get("pre_click_text"),
