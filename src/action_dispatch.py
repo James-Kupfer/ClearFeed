@@ -46,6 +46,7 @@ YAML profile schema:
       body: |                # then trash the original message. Sent verbatim.
         ...
       trash: true            # default true
+      skip_addresses: ["*noreply*", "invitations@linkedin.com"]  # fnmatch, case-insensitive
       linkedin_ignore:       # optional: afterwards open the URL in prompt JSON key
         url_key: decline_url #   `url_key` in the logged-in LinkedIn browser profile
         click_text: null     #   optional button/link label to click on that page
@@ -197,6 +198,9 @@ def _validate_auto_reply(profile: dict) -> None:
             raise ValueError(f"Profile auto_reply section missing required field: {field!r}")
     if not str(cfg["body"]).strip():
         raise ValueError("Profile auto_reply 'body' must not be blank")
+    skip = cfg.get("skip_addresses", [])
+    if not isinstance(skip, list) or not all(isinstance(x, str) for x in skip):
+        raise ValueError("Profile auto_reply 'skip_addresses' must be a list of strings")
     if "linkedin_ignore" in cfg:
         li = cfg["linkedin_ignore"]
         if not isinstance(li, dict) or not li.get("url_key"):
@@ -385,7 +389,10 @@ def _action_one(
     log.info("[action] %s prompt result keys: %s", context, list(prompt_result.keys()))
 
     if _auto_reply_matches(profile, prompt_result):
-        return _handle_auto_reply(record, profile, prompt_result, clients)
+        result = _handle_auto_reply(record, profile, prompt_result, clients)
+        if result is not None:
+            return result
+        log.info("[action] %s no deliverable reply address — creating the normal task", context)
 
     handler = _TARGET_HANDLERS[profile["target"]]
     return handler(record, profile, prompt_result, clients)
@@ -515,16 +522,26 @@ def _single_line(value: str) -> str:
     return " ".join(str(value).split())
 
 
-def _reply_address(headers: dict) -> str | None:
-    """Bare address to reply to: Reply-To if present, else From. None if unusable."""
+def _reply_address(headers: dict, skip_patterns: list[str] | None = None) -> str | None:
+    """First usable address from Reply-To, then From, that matches no skip pattern.
+
+    skip_patterns are case-insensitive fnmatch globs for relay / no-reply
+    addresses (e.g. LinkedIn's notification senders) where a reply would never
+    reach the person. None if no address qualifies.
+    """
     from email.utils import parseaddr
+    from fnmatch import fnmatch
+    patterns = [p.lower() for p in (skip_patterns or [])]
     for name in ("reply-to", "from"):
         raw = headers.get(name)
         if not raw:
             continue
         _, addr = parseaddr(_single_line(raw))
-        if addr and "@" in addr and not any(c.isspace() for c in addr):
-            return addr
+        if not addr or "@" not in addr or any(c.isspace() for c in addr):
+            continue
+        if any(fnmatch(addr.lower(), p) for p in patterns):
+            continue
+        return addr
     return None
 
 
@@ -550,8 +567,12 @@ def _ignore_on_linkedin(li_cfg: dict, prompt_result: dict) -> str | None:
 
 def _handle_auto_reply(
     record: dict, profile: dict, prompt_result: dict, clients: dict
-) -> ActionResult:
+) -> ActionResult | None:
     """Email the profile's `auto_reply.body` to the sender, then trash the original.
+
+    Returns None, having done nothing, when no deliverable address exists (all
+    candidates are no-reply / skipped) — the caller then falls back to the
+    profile's normal handler so the record is not lost.
 
     Send happens first; the trash and the optional LinkedIn ignore only run after
     a successful send. If either fails the reply has already gone out, so the
@@ -581,9 +602,13 @@ def _handle_auto_reply(
         return _fail(f"Gmail error reading message {source_ref}: {exc}")
 
     headers: dict = meta.get("headers") or {}
-    to = _reply_address(headers)
+    to = _reply_address(headers, cfg.get("skip_addresses"))
     if not to:
-        return _fail(f"No usable reply address in message {source_ref}")
+        log.warning(
+            "[action] record_id=%d no deliverable reply address (From=%r, Reply-To=%r)",
+            record_id, headers.get("from"), headers.get("reply-to"),
+        )
+        return None
 
     subject = _single_line(headers.get("subject", ""))
     if not subject.lower().startswith("re:"):

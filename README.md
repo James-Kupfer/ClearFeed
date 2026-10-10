@@ -194,13 +194,17 @@ target handler for records whose prompt JSON matches. `profiles/task_connection.
 uses it so a connection request the prompt marks `action: Decline` is not turned
 into a task: ClearFeed emails the configured `body` to the sender (Reply-To, else
 From; threaded on the original) and moves the original Gmail message to Trash.
-All other actions still create tasks.
+All other actions still create tasks. If neither Reply-To nor From survives
+`skip_addresses` (LinkedIn notifications come from `invitations@linkedin.com` /
+`messages-noreply@linkedin.com`, which never reach the person), nothing is sent,
+trashed or ignored and the normal task is created instead.
 
 ```yaml
 auto_reply:
   when_key: action        # prompt JSON key to test
   when_value: Decline     # case-insensitive exact match
   trash: true             # optional, default true: trash the original message after replying
+  skip_addresses: ["*noreply*", "invitations@linkedin.com"]  # optional fnmatch globs; never reply to these
   linkedin_ignore:        # optional: then open this URL in the logged-in LinkedIn browser profile
     url_key: decline_url  #   prompt JSON key holding the ignore link (must be https on linkedin.com)
     click_text: null      #   optional button/link label to click on that page

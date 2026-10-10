@@ -750,7 +750,7 @@ def _mock_gmail(headers: dict | None = None) -> MagicMock:
         "thread_id": "thr-1",
         "headers": headers
         or {
-            "from": "Jane Doe via LinkedIn <invitations@linkedin.com>",
+            "from": "Jane Doe <jane@real.com>",
             "subject": "Jane wants to connect",
             "message-id": "<orig@mail>",
         },
@@ -807,6 +807,7 @@ def test_connection_profile_loads_with_auto_reply():
     assert (cfg["when_key"], cfg["when_value"]) == ("action", "Decline")
     assert "I am not an open networker" in cfg["body"]
     assert "cr.source_ref" in profile["trigger"]["sql"]
+    assert "invitations@linkedin.com" in cfg["skip_addresses"]
 
 
 def test_auto_reply_matches_is_exact_but_case_and_whitespace_insensitive():
@@ -870,7 +871,7 @@ def test_handle_auto_reply_sends_threaded_reply_to_sender_then_trashes():
 
     gmail.get_message_headers.assert_called_once_with("msg-1")
     gmail.send_reply.assert_called_once_with(
-        to="invitations@linkedin.com",
+        to="jane@real.com",
         subject="Re: Jane wants to connect",
         body="Declined.\n\nSincerely,\nJames",
         thread_id="thr-1",
@@ -955,15 +956,87 @@ def test_handle_auto_reply_trash_failure_after_send_stays_created():
     assert "trash failed" in result.error
 
 
-def test_handle_auto_reply_no_usable_address_does_not_send():
+def test_handle_auto_reply_no_usable_address_does_nothing_and_returns_none():
     from action_dispatch import _handle_auto_reply
 
     gmail = _mock_gmail({"from": "undisclosed-recipients", "subject": "x"})
     result = _handle_auto_reply(_gmail_record(), _auto_reply_profile(), {}, {"gmail": gmail})
 
-    assert result.status == "failed"
+    assert result is None
     gmail.send_reply.assert_not_called()
     gmail.trash_message.assert_not_called()
+
+
+_LINKEDIN_SKIP = ["*noreply*", "invitations@linkedin.com"]
+
+
+@pytest.mark.parametrize(
+    "sender",
+    [
+        "Matthew Conti <invitations@linkedin.com>",
+        '"Jim (via LinkedIn)" <messages-noreply@linkedin.com>',
+        "Invitations <INVITATIONS@LinkedIn.com>",
+    ],
+)
+def test_handle_auto_reply_skips_linkedin_relay_senders_without_side_effects(sender):
+    """Real senders from ActionRuns: a reply to these never reaches the person."""
+    from action_dispatch import _handle_auto_reply
+
+    gmail = _mock_gmail({"from": sender, "subject": "I want to connect"})
+    profile = _auto_reply_profile(skip_addresses=_LINKEDIN_SKIP)
+    profile["auto_reply"]["linkedin_ignore"] = {"url_key": "decline_url"}
+    with patch("linkedin_client.ignore_invitation") as ignore:
+        result = _handle_auto_reply(
+            _gmail_record(), profile, {"decline_url": "https://www.linkedin.com/x"}, {"gmail": gmail}
+        )
+
+    assert result is None
+    gmail.send_reply.assert_not_called()
+    gmail.trash_message.assert_not_called()
+    ignore.assert_not_called()
+
+
+def test_handle_auto_reply_uses_reply_to_when_from_is_skipped():
+    from action_dispatch import _handle_auto_reply
+
+    gmail = _mock_gmail(
+        {"from": "Matt <invitations@linkedin.com>", "reply-to": "Matt <matt@real.com>", "subject": "x"}
+    )
+    result = _handle_auto_reply(
+        _gmail_record(), _auto_reply_profile(skip_addresses=_LINKEDIN_SKIP), {}, {"gmail": gmail}
+    )
+
+    assert result.status == "created"
+    assert gmail.send_reply.call_args.kwargs["to"] == "matt@real.com"
+
+
+def test_action_one_falls_back_to_task_when_no_deliverable_address():
+    from action_dispatch import _action_one
+
+    gmail = _mock_gmail({"from": "Matt <invitations@linkedin.com>", "subject": "x"})
+    todoist = MagicMock()
+    todoist.resolve_project_id.return_value = "proj"
+    todoist.create_task.return_value = "task-7"
+    llm = MagicMock()
+    llm.call_json.return_value = {"action": "Decline", "name": "Matt"}
+    profile = _auto_reply_profile(skip_addresses=_LINKEDIN_SKIP)
+    profile["prompt"] = "p {sender}"
+
+    result = _action_one(_gmail_record(), profile, llm, {"gmail": gmail, "todoist": todoist})
+
+    assert result.status == "created" and result.external_id == "task-7"
+    assert result.target is None
+    gmail.send_reply.assert_not_called()
+    gmail.trash_message.assert_not_called()
+
+
+def test_load_profile_rejects_non_list_skip_addresses(tmp_path):
+    from action_dispatch import _load_profile
+
+    p = tmp_path / "profile.yaml"
+    p.write_text(_minimal_profile({"auto_reply": {**_AUTO_REPLY_CFG, "skip_addresses": "*noreply*"}}))
+    with pytest.raises(ValueError, match="skip_addresses"):
+        _load_profile(p)
 
 
 @pytest.mark.parametrize(

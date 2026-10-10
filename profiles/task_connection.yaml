@@ -52,7 +52,8 @@ todoist:
 
 # --- Auto-reply ---
 # Replaces the Todoist task: when the prompt's `action` is "Decline", ClearFeed
-# emails `body` to the sender (Reply-To, else From; threaded on the original),
+# emails `body` to the sender (Reply-To, else From, unless it is in skip_addresses;
+# threaded on the original),
 # then trashes the original message in Gmail and opens the request's ignore link
 # (`decline_url` from the prompt JSON) in a logged-in LinkedIn browser profile so
 # the request is archived. No task is created for these.
@@ -63,6 +64,10 @@ auto_reply:
   when_key: action
   when_value: Decline
   trash: true
+  # Addresses a reply can never reach the person at (LinkedIn's own senders). If
+  # neither Reply-To nor From survives this list, nothing is sent, trashed or
+  # ignored and the normal Todoist task is created instead.
+  skip_addresses: ["*noreply*", "*no-reply*", "*donotreply*", "invitations@linkedin.com"]
   linkedin_ignore:
     url_key: decline_url
     click_text: null            # set to the button label if opening the link alone doesn't ignore it

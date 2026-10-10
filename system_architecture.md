@@ -193,6 +193,9 @@ secrets from. `security_config.py` itself sources the actual values from a
   connection request whose reply fails to send gets a `failed` ActionRun (so no
   second attempt) and no Todoist task; delete the row to retry. The send itself
   is never retried inside one run, to avoid emailing a stranger twice.
-- **Auto-reply recipient is the message's Reply-To, else From.** For notification
-  mail such as LinkedIn's, that address may be a no-reply or relay address
-  rather than the person; verify against a real decline before relying on it.
+- **Auto-reply recipient is the message's Reply-To, else From, minus
+  `auto_reply.skip_addresses`.** LinkedIn notification mail comes from
+  `invitations@linkedin.com` / `messages-noreply@linkedin.com`, so unless a
+  message carries a Reply-To for the real person, the auto-reply is skipped and
+  the normal Todoist task is created. Whether LinkedIn sets such a Reply-To has
+  not been confirmed.

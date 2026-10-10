@@ -1,5 +1,12 @@
 # Change Log
 
+## 2026-10-10 - Never auto-reply to LinkedIn relay addresses
+
+**Type**: fix
+**Files**: src/action_dispatch.py, profiles/task_connection.yaml, tests/test_action_dispatch.py, README.md, system_architecture.md
+
+Seven prior `task_connection` records were all sent from `invitations@linkedin.com` or `messages-noreply@linkedin.com`. With no Reply-To, the auto-reply would have gone to LinkedIn, never the person, while the email was still trashed and the request ignored. New `auto_reply.skip_addresses` (fnmatch globs) excludes such addresses; if no deliverable address remains, `_handle_auto_reply` returns None having done nothing and the normal Todoist task is created. A message with a Reply-To for a real person still gets the reply. An unusable address previously failed the record; it now falls back to the task too.
+
 ## 2026-10-10 - Ignore declined connection requests on LinkedIn
 
 **Type**: feature
