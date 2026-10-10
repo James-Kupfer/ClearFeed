@@ -1,4 +1,4 @@
-﻿@echo off
+@echo off
 :: ClearFeed stage runner. Usage: clearfeed.bat <stage> [args]
 ::   clearfeed.bat ingest
 ::   clearfeed.bat ingest --dry-run
