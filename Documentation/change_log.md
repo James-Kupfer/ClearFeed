@@ -3,9 +3,9 @@
 ## 2026-10-11 - Trash LinkedIn job alerts after export
 
 **Type**: feature
-**Files**: src/config.py, src/ingest_gmail.py, src/db.py, src/export.py, profiles/job_export.yaml, tests/test_ingest.py, tests/test_export.py, README.md
+**Files**: src/config.py, src/ingest_gmail.py, src/db.py, src/gmail_client.py, src/export.py, profiles/job_export.yaml, tests/test_ingest.py, tests/test_export.py, tests/test_gmail_trash.py, README.md
 
-Emails from `jobalerts-noreply@linkedin.com` used to be trashed at ingest, before `job_export` ran. New `config.TRASH_DEFERRED_SENDERS` makes ingest label and store them but leave them in the inbox (status `kept`). New optional export-profile block `trash_after_export: {sender}` (set in `job_export.yaml`) trashes the Gmail message of each exported row from that sender after the `.xlsx` is saved, via `db.query_gmail_refs` + `GmailClient.trash_message`. Failures are logged and retried by the next export. A job alert that is not exported (not tagged `job_search`/`recruiter`, or older than the 48 h window) stays in the inbox.
+Emails from `jobalerts-noreply@linkedin.com` used to be trashed at ingest, before `job_export` ran. New `config.TRASH_DEFERRED_SENDERS` makes ingest label and store them but leave them in the inbox (status `kept`). New optional export-profile block `trash_after_export: {sender}` (set in `job_export.yaml`) trashes the Gmail message of each exported row from that sender after the `.xlsx` is saved, via `db.query_gmail_refs` + `GmailClient.trash_message`. The export also sweeps `from:<sender> in:inbox label:ProcessedClearFeed` (`GmailClient.list_message_ids`), including when no rows matched. Reason: Gmail appends repeat alerts to an existing thread, ingest reads only the thread's first message and treats the thread as a duplicate, so it labels the new messages processed but never trashed them (16 such threads found in the inbox). Failures are logged and retried by the next export. Known gap, unchanged: those appended alerts are never ingested, so their listings are not exported.
 
 ## 2026-10-10 - Random delay before clicking Ignore
 

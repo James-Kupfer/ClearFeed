@@ -196,6 +196,7 @@ def test_run_export_trashes_matching_emails_after_save(tmp_path):
     p = _write_trash_profile(tmp_path)
     order: list[str] = []
     gmail = MagicMock()
+    gmail.list_message_ids.return_value = ["m2", "m3"]
     gmail.trash_message.side_effect = lambda ref: order.append(f"trash:{ref}")
 
     with patch("export.query_sql", return_value=(["id"], [{"id": 1}, {"id": 2}])), \
@@ -205,7 +206,11 @@ def test_run_export_trashes_matching_emails_after_save(tmp_path):
         run_export(p)
 
     refs.assert_called_once_with([1, 2], "jobalerts-noreply@linkedin.com")
-    assert order == ["save", "trash:m1", "trash:m2"]
+    gmail.list_message_ids.assert_called_once_with(
+        "from:jobalerts-noreply@linkedin.com in:inbox label:ProcessedClearFeed"
+    )
+    # m2 is in both sets and is trashed once; m3 is a processed-but-unexported message.
+    assert order == ["save", "trash:m1", "trash:m2", "trash:m3"]
 
 
 def test_run_export_does_not_trash_when_not_configured(tmp_path):
@@ -225,6 +230,7 @@ def test_run_export_trash_failure_does_not_raise(tmp_path):
 
     p = _write_trash_profile(tmp_path)
     gmail = MagicMock()
+    gmail.list_message_ids.return_value = []
     gmail.trash_message.side_effect = [RuntimeError("boom"), None]
 
     with patch("export.query_sql", return_value=(["id"], [{"id": 1}, {"id": 2}])), \
@@ -236,12 +242,19 @@ def test_run_export_trash_failure_does_not_raise(tmp_path):
     assert gmail.trash_message.call_count == 2
 
 
-def test_run_export_without_rows_trashes_nothing(tmp_path):
+def test_run_export_without_rows_still_sweeps_processed_messages(tmp_path):
     from export import run_export
 
     p = _write_trash_profile(tmp_path)
+    gmail = MagicMock()
+    gmail.list_message_ids.return_value = ["m9"]
+
     with patch("export.query_sql", return_value=(["id"], [])), \
-         patch("export.query_gmail_refs") as refs:
+         patch("export._save_excel") as save, \
+         patch("export.query_gmail_refs") as refs, \
+         patch("gmail_client.GmailClient", return_value=gmail):
         run_export(p)
 
+    save.assert_not_called()
     refs.assert_not_called()
+    gmail.trash_message.assert_called_once_with("m9")

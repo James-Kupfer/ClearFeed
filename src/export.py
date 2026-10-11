@@ -23,8 +23,8 @@ Profile schema (YAML):
     trash_after_export:                             # optional
       sender: jobalerts-noreply@linkedin.com        # case-insensitive substring of the From header
 
-`trash_after_export` moves the Gmail messages of exported rows from that sender to
-Trash once the file is saved. The SELECT must include `cr.id`. Pair it with
+`trash_after_export` moves that sender's Gmail messages to Trash after the export: the
+exported rows' messages, plus any inbox message ingest already marked processed. The SELECT must include `cr.id`. Pair it with
 config.TRASH_DEFERRED_SENDERS so ingest leaves those emails in the inbox.
 """
 
@@ -142,28 +142,36 @@ def _save_excel(
 
 
 def _trash_exported_emails(trash_cfg: dict, row_dicts: list[dict]) -> None:
-    """Trash the Gmail messages behind exported rows whose sender matches.
+    """Trash the sender's Gmail messages once their export is done.
 
-    Runs only after the file is saved. Never raises: a failure leaves the email
-    in the inbox, and the next export (rows stay in the query window) retries it.
+    Two sets, de-duplicated: (1) the messages behind the exported rows; (2) every
+    inbox message from the sender that ingest already marked processed. Set 2 covers
+    alerts Gmail appended to an already-ingested thread: ingest only reads a thread's
+    first message, so it labels the thread processed but never trashes them.
+
+    Never raises: a failure leaves the email in the inbox for the next export.
     """
+    sender = trash_cfg["sender"].strip()
+    refs: list[str] = []
     record_ids = [r["id"] for r in row_dicts if r.get("id") is not None]
-    if not record_ids:
-        log.warning("trash_after_export skipped: the SELECT has no 'id' column")
-        return
-    try:
-        refs = query_gmail_refs(record_ids, trash_cfg["sender"].strip())
-    except DbError as exc:
-        log.error("trash_after_export: could not look up Gmail messages: %s", exc)
-        return
-    if not refs:
-        return
+    if record_ids:
+        try:
+            refs = query_gmail_refs(record_ids, sender)
+        except DbError as exc:
+            log.error("trash_after_export: could not look up exported messages: %s", exc)
+    elif row_dicts:
+        log.warning("trash_after_export: the SELECT has no 'id' column; sweeping only")
     try:
         from gmail_client import GmailClient
         gmail = GmailClient()
     except Exception as exc:
         log.error("trash_after_export: Gmail unavailable, nothing trashed: %s", exc)
         return
+    try:
+        refs += gmail.list_message_ids(f"from:{sender} in:inbox label:{config.PROCESSED_LABEL}")
+    except Exception as exc:
+        log.error("trash_after_export: could not list processed inbox messages: %s", exc)
+    refs = list(dict.fromkeys(refs))
     trashed = 0
     for ref in refs:
         try:
@@ -171,7 +179,7 @@ def _trash_exported_emails(trash_cfg: dict, row_dicts: list[dict]) -> None:
             trashed += 1
         except Exception as exc:
             log.error("trash_after_export: could not trash message %s: %s", ref, exc)
-    log.info("Trashed %d of %d exported email(s) from %s", trashed, len(refs), trash_cfg["sender"])
+    log.info("Trashed %d of %d email(s) from %s", trashed, len(refs), sender)
 
 
 def run_export(profile_path: str) -> None:
@@ -185,8 +193,11 @@ def run_export(profile_path: str) -> None:
     rows = [[r[c] for c in col_names] for r in row_dicts]
     log.info("Query returned %d row(s)", len(rows))
 
+    trash_cfg = profile.get("trash_after_export")
     if not rows:
         log.info("No records matched — no Excel file written.")
+        if trash_cfg:
+            _trash_exported_emails(trash_cfg, [])
         return
 
     filename_template: str = profile.get("filename_template", "{profile}_{timestamp}.xlsx")
@@ -194,7 +205,6 @@ def run_export(profile_path: str) -> None:
     dest = _save_excel(col_names, rows, output_path, filename_template, profile_name)
     log.info("Saved: %s (%d rows)", dest, len(rows))
 
-    trash_cfg = profile.get("trash_after_export")
     if trash_cfg:
         _trash_exported_emails(trash_cfg, row_dicts)
 

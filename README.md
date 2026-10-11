@@ -254,7 +254,7 @@ trash_after_export:                       # optional
 
 Column headers in the Excel output are derived from `cursor.description` (the SQL `SELECT` column names/aliases) — no separate `columns:` list.
 
-`trash_after_export` moves the Gmail messages of exported rows from that sender to Trash once the `.xlsx` is saved (requires `cr.id` in the `SELECT`). A trash failure is logged, not raised; the email stays in the inbox and is retried by the next export while its row is still in the query window. Pair it with `TRASH_DEFERRED_SENDERS` in `src/config.py`, which makes ingest leave that sender's emails in the inbox instead of trashing them immediately.
+`trash_after_export` moves that sender's Gmail messages to Trash after the export: the exported rows' messages (needs `cr.id` in the `SELECT`), plus every inbox message from the sender that ingest already marked `ProcessedClearFeed`. The second set matters because Gmail appends repeat alerts to an existing thread and ingest reads only a thread's first message, so it labels the thread processed without trashing the new messages. It also runs when no rows matched. A trash failure is logged, not raised; the email stays in the inbox until the next export. Pair it with `TRASH_DEFERRED_SENDERS` in `src/config.py`, which makes ingest leave that sender's emails in the inbox instead of trashing them immediately.
 
 ### Adding a new capability
 

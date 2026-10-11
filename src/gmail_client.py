@@ -321,6 +321,23 @@ class GmailClient:
         self._service.users().threads().trash(userId="me", id=thread_id).execute()
 
     @retry(exceptions=(HttpError,))
+    def list_message_ids(self, query: str) -> list[str]:
+        """Return the ids of every message matching a Gmail search query (all pages)."""
+        ids: list[str] = []
+        page_token: str | None = None
+        while True:
+            response = (
+                self._service.users()
+                .messages()
+                .list(userId="me", q=query, maxResults=500, pageToken=page_token)
+                .execute()
+            )
+            ids.extend(m["id"] for m in response.get("messages", []))
+            page_token = response.get("nextPageToken")
+            if not page_token:
+                return ids
+
+    @retry(exceptions=(HttpError,))
     def trash_message(self, message_id: str) -> None:
         """Move a single message to Gmail Trash (recoverable for 30 days).
 
