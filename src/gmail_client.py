@@ -183,11 +183,17 @@ class GmailClient:
     # ------------------------------------------------------------------
 
     def fetch_ingest_threads(
-        self, max_results: int = config.EMAIL_MAX_THREADS
+        self,
+        max_results: int = config.EMAIL_MAX_THREADS,
+        include_processed: bool = False,
     ) -> list[dict]:
         """Fetch threads eligible for ingest: all inbox threads within
         EMAIL_INGEST_LOOKBACK_DAYS, plus labeled trash threads within
         EMAIL_TRASH_LOOKBACK_DAYS. Deduplicates by ID.
+
+        include_processed: also return inbox threads already labeled
+        ProcessedClearFeed. Ingest skips messages it already stored, so this
+        backfills messages that earlier runs labeled without storing.
 
         Returns:
             List of thread summary dicts (id, snippet).
@@ -198,10 +204,8 @@ class GmailClient:
         inbox_cutoff = datetime.now(timezone.utc) - timedelta(
             days=config.EMAIL_INGEST_LOOKBACK_DAYS
         )
-        inbox_query = (
-            f"in:inbox -label:{config.PROCESSED_LABEL} "
-            f"after:{inbox_cutoff:%Y/%m/%d}"
-        )
+        processed_filter = "" if include_processed else f"-label:{config.PROCESSED_LABEL} "
+        inbox_query = f"in:inbox {processed_filter}after:{inbox_cutoff:%Y/%m/%d}"
         for thread in self._list_threads(inbox_query, max_results):
             threads_by_id[thread["id"]] = thread
 

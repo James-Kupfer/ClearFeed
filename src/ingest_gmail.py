@@ -1,23 +1,24 @@
 """Stage 1: Gmail ingestion for ClearFeed.
 
-Fetches threads that have been labeled (by a prior run or Cowork) but not yet
-marked ProcessedClearFeed. For each thread:
+Fetches threads not yet marked ProcessedClearFeed. For each message in the thread
+(oldest first; Gmail appends repeat alerts to an existing thread):
   1. Extract body + images
   2. Summarize with Haiku, then classify (labels, tags) off the summary
   3. Download and store images
   4. Write ContentRecords + RecordTerms
-  5. Apply all bucket labels + ProcessedClearFeed to the Gmail thread
-  6. Trash the thread (final, irreversible step)
+Then, for the thread:
+  5. Apply all bucket labels + ProcessedClearFeed (the latter only if no message failed)
+  6. Trash each stored message (message-level; kept if excluded or deferred)
 
-Failure at any step before step 5 leaves the thread untouched for retry.
-Duplicate source_refs are silently skipped (idempotent).
+A message that fails before step 4 is not stored and keeps the thread unmarked for
+retry. Duplicate source_refs (message ids) are silently skipped (idempotent).
 """
 
 import logging
 import re
 import sys
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from email.utils import parsedate_to_datetime
 from pathlib import Path
@@ -86,6 +87,7 @@ class IngestResult:
 def run_ingest(
     dry_run: bool = False,
     limit: int | None = None,
+    include_processed: bool = False,
 ) -> list[IngestResult]:
     """Ingest eligible Gmail threads. Returns per-thread results.
 
@@ -94,6 +96,8 @@ def run_ingest(
             trash_thread so the original emails are untouched.
         limit: cap the number of threads processed. Defaults to
             INGEST_DRY_RUN_LIMIT in dry-run mode, unlimited otherwise.
+        include_processed: also fetch inbox threads already labeled
+            ProcessedClearFeed, to store messages earlier runs labeled but skipped.
     """
     log.info("[run_ingest] === Starting run_ingest (dry_run=%s) ===", dry_run)
 
@@ -125,7 +129,7 @@ def run_ingest(
 
     log.info("[run_ingest] Step 4: Fetching eligible threads...")
     try:
-        threads = gmail.fetch_ingest_threads()
+        threads = gmail.fetch_ingest_threads(include_processed=include_processed)
         log.info("[run_ingest] ✓ Thread fetch complete. Found %d threads", len(threads))
     except Exception as exc:
         log.exception("[run_ingest] ✗ FAILED to fetch threads")
@@ -156,6 +160,18 @@ def run_ingest(
     return results
 
 
+@dataclass
+class _MessageOutcome:
+    """Result of ingesting one message of a thread."""
+
+    status: str  # stored | duplicate | trashed | failed
+    message_id: str = ""
+    record_id: int | None = None
+    labels: list[str] = field(default_factory=list)
+    keep: bool = False  # leave in the inbox: trash-excluded or trash-deferred sender
+    error: str | None = None
+
+
 def _ingest_thread(
     thread_id: str,
     gmail: GmailClient,
@@ -163,38 +179,105 @@ def _ingest_thread(
     label_map: dict[str, str],
     dry_run: bool = False,
 ) -> IngestResult:
-    """Process a single Gmail thread through the full ingest pipeline.
+    """Process every message of a Gmail thread through the ingest pipeline.
 
-    In dry-run mode, steps 1-6 (fetch, classify, DB write) run normally.
-    Steps 7-8 (apply_labels, trash_thread) are skipped so the email is
-    left untouched in Gmail and remains eligible for a future real run.
+    Each message becomes its own record (source_ref = message id), so a message
+    Gmail appends to an already-ingested thread is picked up too. Messages already
+    in the DB are skipped. Stored messages are trashed one by one (message-level, so
+    an older kept message in the same thread is untouched) unless they match a
+    TRASH_EXCLUSIONS rule or a TRASH_DEFERRED_SENDERS entry.
+
+    The thread gets ProcessedClearFeed only when no message failed, so a failed
+    message is retried on the next run. In dry-run mode the DB writes happen but
+    nothing in Gmail is trashed or labeled except ProcessedClearFeed.
     """
     try:
-        # Step 1: fetch thread messages
         messages = gmail.get_thread_messages(thread_id)
         if not messages:
             return IngestResult(thread_id, "skipped", error="Empty thread")
 
-        parts = gmail.extract_message_parts(messages)
-        source_ref = messages[0]["id"]  # use first message ID as stable identifier
+        outcomes = [_ingest_message(m, gmail, llm, dry_run) for m in messages]
+        stored = [o for o in outcomes if o.status == "stored"]
+        failed = next((o for o in outcomes if o.status == "failed"), None)
+        record_id = stored[0].record_id if stored else None
 
-        # Step 2a: early duplicate check — avoids LLM call on already-ingested threads
-        if record_exists("gmail", source_ref):
-            log.info("Skipping duplicate (early check): gmail/%s", source_ref)
+        if not stored:
+            if failed:
+                return IngestResult(thread_id, "failed", error=failed.error)
+            if all(o.status == "trashed" for o in outcomes):
+                return IngestResult(thread_id, "trashed")
             _apply_processed_label(thread_id, gmail, label_map)
             return IngestResult(thread_id, "duplicate", error="Already in DB")
 
-        # Step 2b: build plain body text from HTML if needed
+        if dry_run:
+            log.info("DRY RUN: %d record(s) written for thread %s", len(stored), thread_id)
+            if not failed:
+                # Mark processed so this thread is not fetched again on the next run
+                _apply_processed_label(thread_id, gmail, label_map)
+            return IngestResult(thread_id, "failed" if failed else "dry_run",
+                                record_id=record_id, error=failed.error if failed else None)
+
+        # Apply bucket labels to the thread (non-fatal for the DB, which is already written).
+        labels = list(dict.fromkeys(lbl for o in stored for lbl in o.labels))
+        label_ids = [label_map[lbl] for lbl in labels if lbl in label_map]
+        if not failed:
+            label_ids.append(label_map[config.PROCESSED_LABEL])
+        try:
+            gmail.apply_labels(thread_id, label_ids)
+        except Exception as exc:
+            log.error("Label apply failed for thread %s: %s", thread_id, exc)
+            return IngestResult(
+                thread_id, "failed", record_id=record_id, error=f"Label apply failed: {exc}"
+            )
+
+        # Trash each stored message that is not excluded or deferred.
+        for o in stored:
+            if o.keep:
+                log.info("Message %s kept in inbox (trash exclusion/deferral)", o.message_id)
+                continue
+            try:
+                gmail.trash_message(o.message_id)
+            except Exception as exc:
+                log.error("Trash failed for message %s (record saved): %s", o.message_id, exc)
+
+        if failed:
+            return IngestResult(thread_id, "failed", record_id=record_id, error=failed.error)
+        status = "kept" if any(o.keep for o in stored) else "ingested"
+        return IngestResult(thread_id, status, record_id=record_id)
+
+    except Exception as exc:
+        log.exception("Unexpected error ingesting thread %s", thread_id)
+        return IngestResult(thread_id, "failed", error=str(exc))
+
+
+def _ingest_message(
+    msg: dict, gmail: GmailClient, llm: LLMClient, dry_run: bool
+) -> _MessageOutcome:
+    """Fetch, classify and store one message. Never raises.
+
+    Spam and security/promo messages are trashed (message-level) without a DB write.
+    """
+    message_id = msg.get("id", "")
+    try:
+        parts = gmail.extract_message_parts([msg])
+        source_ref = message_id
+
+        # Early duplicate check — avoids an LLM call on already-ingested messages
+        if record_exists("gmail", source_ref):
+            log.info("Skipping duplicate (early check): gmail/%s", source_ref)
+            return _MessageOutcome("duplicate", message_id)
+
+        # Build plain body text from HTML if needed
         body_text = parts.get("body_text", "")
         if not body_text and parts.get("html_body"):
             body_text = _html_to_text(parts["html_body"])
 
         if not body_text:
-            return IngestResult(thread_id, "failed", error="No body text extracted")
+            return _MessageOutcome("failed", message_id, error="No body text extracted")
 
         body_text = truncate_body(body_text)
 
-        # Step 2c: scrape linked article content and append before classification
+        # Scrape linked article content and append before classification
         if config.ARTICLE_SCRAPE_ENABLED:
             article_text = fetch_email_articles(parts.get("html_body", ""))
             if article_text:
@@ -202,20 +285,20 @@ def _ingest_thread(
                     f"<email_body>\n{body_text}\n</email_body>\n\n{article_text}"
                 )
 
-        # Step 2d: replace emoji with text descriptions before storage and classification
+        # Replace emoji with text descriptions before storage and classification
         body_text = strip_emoji(body_text)
 
-        # Step 3: deterministic trash check (security alerts / promos)
+        # Deterministic trash check (security alerts / promos)
         subject = parts.get("subject", "")
-        if _should_trash(subject, parts.get("sender", "")):
-            if not dry_run:
-                gmail.trash_thread(thread_id)
-            else:
-                log.info("DRY RUN: would trash thread %s (%s)", thread_id, subject)
-            return IngestResult(thread_id, "trashed")
-
-        # Step 4: LLM summarize, then classify.
         sender = parts.get("sender", "")
+        if _should_trash(subject, sender):
+            if not dry_run:
+                gmail.trash_message(message_id)
+            else:
+                log.info("DRY RUN: would trash message %s (%s)", message_id, subject)
+            return _MessageOutcome("trashed", message_id)
+
+        # LLM summarize, then classify.
         (
             summary,
             executive_summary,
@@ -232,8 +315,8 @@ def _ingest_thread(
         if any(lbl.lower() == "spam" for lbl in classify_result.get("labels", [])):
             log.info("[ingest] %s → LLM Spam classification → trashing without storage", source_ref)
             if not dry_run:
-                gmail.trash_thread(thread_id)
-            return IngestResult(thread_id, "trashed")
+                gmail.trash_message(message_id)
+            return _MessageOutcome("trashed", message_id)
 
         labels = resolve_labels(classify_result.get("labels", []))
         tags = [normalize_tag(t) for t in classify_result.get("tags", [])]
@@ -250,23 +333,23 @@ def _ingest_thread(
             classify_tokens,
         )
 
-        # Step 5: download images
+        # Download images
         received_at = _parse_date(parts.get("date_str", ""))
         image_paths = _download_images(
             source_ref=source_ref,
             html_body=parts.get("html_body", ""),
             attachments=parts.get("image_attachments", []),
             gmail=gmail,
-            message_id=messages[0]["id"],
+            message_id=message_id,
         )
 
-        # Step 6: write DB record (halt on failure; do NOT label/trash if this fails)
+        # Write DB record (halt on failure; the caller does not label/trash this message)
         linked_url = _extract_first_url(body_text)
         rec = ContentRecord(
             source_type="gmail",
             source_ref=source_ref,
             received_at=received_at,
-            sender=parts.get("sender", ""),
+            sender=sender,
             subject=subject,
             body_text=body_text,
             linked_article_url=linked_url,
@@ -294,55 +377,24 @@ def _ingest_thread(
         except DuplicateRecordError:
             # Race condition: another run inserted between our early check and now
             log.info("Skipping duplicate (late check): gmail/%s", source_ref)
-            _apply_processed_label(thread_id, gmail, label_map)
-            return IngestResult(thread_id, "duplicate", error="Already in DB")
+            return _MessageOutcome("duplicate", message_id)
         except DbError as exc:
-            return IngestResult(thread_id, "failed", error=str(exc))
+            return _MessageOutcome("failed", message_id, error=str(exc))
 
         if dry_run:
-            log.info(
-                "DRY RUN: record %d written — labels=%s tags=%s",
-                record_id, labels, tags,
-            )
-            # Apply ProcessedClearFeed so this thread is not fetched again on the next run
-            _apply_processed_label(thread_id, gmail, label_map)
-            return IngestResult(thread_id, "dry_run", record_id=record_id)
+            log.info("DRY RUN: record %d written — labels=%s tags=%s", record_id, labels, tags)
 
-        # Step 7: apply labels to Gmail thread (non-fatal if this fails)
-        label_ids = [label_map[lbl] for lbl in labels if lbl in label_map]
-        label_ids.append(label_map[config.PROCESSED_LABEL])
-        try:
-            gmail.apply_labels(thread_id, label_ids)
-        except Exception as exc:
-            log.error("Label apply failed for thread %s: %s", thread_id, exc)
-            return IngestResult(
-                thread_id,
-                "failed",
-                record_id=record_id,
-                error=f"Label apply failed: {exc}",
-            )
-
-        # Step 8: move to Trash — skip if record matches a TRASH_EXCLUSIONS rule
-        if is_trash_excluded(labels, tags):
-            log.info(
-                "Thread %s kept in inbox (exclusion match: labels=%s tags=%s)",
-                thread_id, labels, tags,
-            )
-            return IngestResult(thread_id, "kept", record_id=record_id)
-        if _is_trash_deferred(sender):
-            log.info("Thread %s kept in inbox (trash deferred for sender %s)", thread_id, sender)
-            return IngestResult(thread_id, "kept", record_id=record_id)
-
-        try:
-            gmail.trash_thread(thread_id)
-        except Exception as exc:
-            log.error("Trash failed for thread %s (record saved): %s", thread_id, exc)
-
-        return IngestResult(thread_id, "ingested", record_id=record_id)
+        return _MessageOutcome(
+            "stored",
+            message_id,
+            record_id=record_id,
+            labels=labels,
+            keep=is_trash_excluded(labels, tags) or _is_trash_deferred(sender),
+        )
 
     except Exception as exc:
-        log.exception("Unexpected error ingesting thread %s", thread_id)
-        return IngestResult(thread_id, "failed", error=str(exc))
+        log.exception("Unexpected error ingesting message %s", message_id)
+        return _MessageOutcome("failed", message_id, error=str(exc))
 
 
 def _apply_processed_label(
@@ -602,9 +654,17 @@ if __name__ == "__main__":
         default=None,
         help=f"Max threads to process (dry-run default: {config.INGEST_DRY_RUN_LIMIT})",
     )
+    parser.add_argument(
+        "--include-processed",
+        action="store_true",
+        help="Also fetch inbox threads already labeled ProcessedClearFeed (one-off backfill "
+        "of messages that earlier runs labeled without storing)",
+    )
     args = parser.parse_args()
 
-    results = run_ingest(dry_run=args.dry_run, limit=args.limit)
+    results = run_ingest(
+        dry_run=args.dry_run, limit=args.limit, include_processed=args.include_processed
+    )
 
     ingested = sum(1 for r in results if r.status == "ingested")
     kept = sum(1 for r in results if r.status == "kept")
