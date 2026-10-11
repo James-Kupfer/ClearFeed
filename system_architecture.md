@@ -68,6 +68,8 @@ writes DigestRuns   target handler;                                   │
 | `digest_orchestrator.py` | runs every profile listed in `orchestration/digest.yaml` via `run_dispatch` | — | manual (`python src/digest_orchestrator.py`); not currently wired to a scheduled task |
 | `dispatch.py` | `kind: digest` | `run_dispatch`, `_load_profile`, `_resolve_bands`, `_build_prompt` | CLI / launcher |
 | `action_dispatch.py` | `kind: action` | `run_action`, `_load_profile`, `_TARGET_HANDLERS/_VALIDATORS/_CLIENTS`; `_run_aggregate` (aggregate mode) | CLI / launcher / orchestrator |
+| `gmail_client.py` (trash) | `GmailClient.trash_message` — message-level trash used by `auto_decline` | action_dispatch (`_trash_original`) |
+| `linkedin_client.py` | Playwright persistent-profile helper: `ignore_invitation` (open page, click Ignore, confirm it disappears), `validate_url`; `--login` one-time sign-in, `--inspect` step-by-step page listing | action_dispatch (`_ignore_on_linkedin`) |
 | `todoist_client.py` | Todoist REST v1 | `TodoistClient` (`resolve_project_id`, `create_task`; `_unwrap_list`) | action_dispatch |
 | `export.py` | `kind: export` | `run_export`, `_load_profile`; columns derived from SQL `cursor.description` | CLI |
 | `reprocess.py` / `reprocess_summary.py` | Re-run classify / summarize on stored records | CLI | — |
@@ -121,6 +123,7 @@ prompt — the two action-digest profiles each carry their own copy.)
 | **Add an export** | New `profiles/<name>.yaml` (`kind: export`) with a `sql:` key. Column headers come from the SQL `SELECT` aliases. No code. |
 | **Add an action (existing target)** | New `profiles/<name>.yaml` (`kind: action`, `target: todoist`). SQL in `trigger.sql` must contain `{{dedup}}`. Add to `orchestration/ingest.yaml` `post_ingest_actions` and/or a task XML. No code. |
 | **Add an aggregate action** | Same as above but add `mode: aggregate`. Prompt receives `{records_json}` and `{prior_actions_json}`; must return `{"actions": [...]}` with `record_ids`. Set `trigger.prior_actions_hours` to control lookback for prior-action context. |
+| **Ignore on LinkedIn and trash instead of a task** | Add an `auto_decline:` block (`when_key`, `when_value`, `linkedin_ignore.{url_key,click_text}`, optional `trash`) to a `per_record` action profile and select `cr.source_type, cr.source_ref` in `trigger.sql`. `action_dispatch._action_one` routes matching records to `_handle_auto_decline` instead of the target handler; if the ignore fails the normal handler runs. See `profiles/task_connection.yaml`. |
 | **Add an action target (e.g. Playwright)** | In `action_dispatch.py`: write `_handle_playwright(record, profile, prompt_result, clients)` returning `ActionResult`; write `_validate_playwright(cfg)`; register both in `_TARGET_HANDLERS` / `_TARGET_VALIDATORS`; if it needs a client, add a factory to `_TARGET_CLIENTS`. Profiles then use `target: playwright` + a `playwright:` config block. **Pipeline, launchers, and tasks are untouched.** |
 | **Expose new ContentRecord columns to action prompts** | Add the column to the `SELECT` list in the profile's `trigger.sql`. No code. |
 | **Expose new ContentRecord columns to digest LLM** | Add the column to the `SELECT` in the profile's `sql:` band. Render it in `dispatch._build_prompt` only if it needs special formatting beyond the default row rendering. |
@@ -138,6 +141,7 @@ prompt — the two action-digest profiles each carry their own copy.)
 |--------|-------|---------------|
 | Gmail | `gmail_client.py` (API read/label/trash + SMTP send) | OAuth client secret + token cache; app password — in `LLM_Config/shared/google/` |
 | Anthropic | `llm_client.py` | `ANTHROPIC_API_KEY` (via `security_config.py`) |
+| LinkedIn (browser) | `linkedin_client.py` — Playwright, persistent Chromium profile at `config.LINKEDIN_BROWSER_PROFILE_DIR` | Your own signed-in session (cookies in the gitignored profile dir); no API key |
 | Todoist | `todoist_client.py` — REST **v1** (`config.TODOIST_BASE_URL`). Responses may be wrapped `{"results": [...]}`; `_unwrap_list` normalizes both bare lists and envelopes. Missing projects are auto-created. | `TODOIST_API_TOKEN` (via `security_config.py`) |
 | PostgreSQL | `db.py` (`localhost:5432`, DB `clearfeed`) | host/port/name/user in `config.py`; `DB_PASSWORD` in `security_config.py` |
 
@@ -185,3 +189,10 @@ secrets from. `security_config.py` itself sources the actual values from a
   one-off blip no longer causes this, but an outage longer than the retry window
   (`LLM_RETRY_ATTEMPTS`, `LLM_RETRY_BASE_DELAY`) still does. To retry, delete the
   row from `ActionRuns` where `profile_name = '<profile>' AND record_id = <id>`.
+- **Auto-decline depends on LinkedIn's page layout.** It clicks a button whose
+  accessible name contains `Ignore` on the `review_url` page and expects it to
+  disappear. If LinkedIn changes the label, signs the session out, or `review_url`
+  isn't a profile page (e.g. a follow-up "messages-noreply" reminder), the ignore
+  fails, nothing is trashed, and the normal Todoist task is created. Re-run
+  `clearfeed.bat linkedin-login` for an expired session.
+  not been confirmed.

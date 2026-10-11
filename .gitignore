@@ -16,3 +16,4 @@ scripts/rerun_situations.py
 Documentation/BATCH_PROCESSING_ANALYSIS.md
 Documentation/CACHING_VERDICT_2026_08_21.md
 src/llm_config.toml
+linkedin_profile/

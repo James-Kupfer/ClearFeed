@@ -10,8 +10,8 @@ model: sonnet
 # prompt-level detection for known senders that never produce real connection requests.
 trigger:
   sql: |
-    SELECT cr.id, cr.sender, cr.subject, cr.executive_summary,
-           cr.body_text, cr.linked_article_url
+    SELECT cr.id, cr.source_type, cr.source_ref, cr.sender, cr.subject,
+           cr.executive_summary, cr.body_text, cr.linked_article_url
     FROM ContentRecords cr
     WHERE cr.enrichment_status = 'complete'
       AND cr.processed_at >= (now() AT TIME ZONE 'America/Chicago') - interval '336 hours'
@@ -49,6 +49,26 @@ todoist:
     **From:** {sender}
     **Subject:** {subject}
     **Link:** {linked_article_url}
+
+# --- Auto-decline ---
+# Replaces the Todoist task: when the prompt's `action` is "Decline", ClearFeed
+# opens the requester's LinkedIn page (`review_url`, the "view profile" link from
+# the email) in the signed-in browser profile and clicks Ignore (LinkedIn then
+# archives the request), then moves the original Gmail message to Trash. No
+# message is sent to the requester. If the ignore can't be done and confirmed
+# (page layout changed, signed out, link missing), nothing is trashed and the
+# normal Todoist task is created instead. Every other action still creates a
+# task. One-time sign-in: clearfeed.bat linkedin-login. Remove this block to go
+# back to tasks only.
+auto_decline:
+  when_key: action
+  when_value: Decline
+  trash: true
+  linkedin_ignore:
+    url_key: review_url         # the requester's profile page, where Ignore is a button (not a link)
+    click_text: "Ignore"        # button clicked on that page; the step fails if it is still there afterwards
+    delay_seconds: [5, 25]      # wait a random 5-25 seconds on the loaded page before clicking Ignore
+    not_url_key: accept_url     # never open the link if the LLM returned the accept URL here
 
 # --- Prompt ---
 # `system` is fully static (no {placeholders}) so it's prompt-cached across every

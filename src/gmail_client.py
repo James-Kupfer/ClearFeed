@@ -320,6 +320,15 @@ class GmailClient:
         """Move a thread to Gmail Trash. Recoverable for 30 days; not a permanent delete."""
         self._service.users().threads().trash(userId="me", id=thread_id).execute()
 
+    @retry(exceptions=(HttpError,))
+    def trash_message(self, message_id: str) -> None:
+        """Move a single message to Gmail Trash (recoverable for 30 days).
+
+        Message-level, unlike trash_thread: a reply sent into the same thread is
+        left alone. Trashing an already-trashed message is a no-op.
+        """
+        self._service.users().messages().trash(userId="me", id=message_id).execute()
+
 
 # ------------------------------------------------------------------
 # SMTP outbound (dispatch)

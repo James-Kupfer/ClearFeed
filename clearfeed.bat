@@ -1,13 +1,16 @@
-﻿@echo off
+@echo off
 :: ClearFeed stage runner. Usage: clearfeed.bat <stage> [args]
 ::   clearfeed.bat ingest
 ::   clearfeed.bat ingest --dry-run
 ::   clearfeed.bat ingest --dry-run --limit 5
+::   clearfeed.bat cycle   (one full pass: token check, ingest, then the post_ingest_actions profiles)
 ::   clearfeed.bat dispatch profiles\investment_digest.yaml
 ::   clearfeed.bat action  profiles\task_connection.yaml
 ::   clearfeed.bat export  profiles\job_export.yaml
 ::   clearfeed.bat reprocess --label Investment
 ::   clearfeed.bat reprocess-summary --label Investment
+::   clearfeed.bat linkedin-login
+::   clearfeed.bat linkedin-inspect   (lists the page's buttons/boxes to find the reply control; sends nothing)
 
 setlocal
 set PYTHONPATH=%~dp0;%~dp0src
@@ -24,11 +27,11 @@ if "%1"=="ingest" (
 )
 
 if "%1"=="dispatch" (
-    if "%2"=="" (
+    if "%~2"=="" (
         echo dispatch requires a profile path, e.g.: clearfeed.bat dispatch profiles\investment_digest.yaml
         exit /b 1
     )
-    python "%~dp0src\dispatch.py" "%2"
+    python "%~dp0src\dispatch.py" "%~2"
     goto :end
 )
 
@@ -57,6 +60,21 @@ if "%1"=="action" (
         exit /b 1
     )
     python "%~dp0src\action_dispatch.py" "%~2"
+    goto :end
+)
+
+if "%1"=="cycle" (
+    python "%~dp0src\ingest_orchestrator.py" %2 %3
+    goto :end
+)
+
+if "%1"=="linkedin-login" (
+    python "%~dp0src\linkedin_client.py" --login
+    goto :end
+)
+
+if "%1"=="linkedin-inspect" (
+    python "%~dp0src\linkedin_client.py" --inspect
     goto :end
 )
 

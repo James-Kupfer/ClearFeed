@@ -1,5 +1,64 @@
 # Change Log
 
+## 2026-10-10 - Random delay before clicking Ignore
+
+**Type**: feature
+**Files**: src/linkedin_client.py, src/action_dispatch.py, profiles/task_connection.yaml, tests/test_linkedin_client.py, README.md
+
+New optional `auto_decline.linkedin_ignore.delay_seconds: [min, max]`; `task_connection` sets `[5, 25]`. After the profile page has loaded, the browser waits a random `min..max` seconds (uniform) before clicking Ignore, and logs the wait. Interpreted as seconds. Each Decline therefore takes 5-25 s longer; declines are processed one after another within a cycle.
+
+## 2026-10-10 - Decline = ignore on LinkedIn + trash; drop the reply
+
+**Type**: feature (supersedes the same-day auto-reply entries below)
+**Files**: src/action_dispatch.py, src/linkedin_client.py, src/gmail_client.py, profiles/task_connection.yaml, clearfeed.bat, tests/test_linkedin_client.py, tests/test_gmail_trash.py, tests/test_action_dispatch.py, README.md, system_architecture.md
+
+LinkedIn's notification emails have no return address and messaging a pending inviter goes through an InMail-style subject+body composer, so replying is dropped. `task_connection` now handles `action: Decline` with a new `auto_decline:` block: open `review_url`, click the `Ignore` button, confirm it disappeared, then trash the Gmail message. No message is sent. If the ignore can't be done and confirmed, nothing is trashed and the normal Todoist task is created.
+
+Removed: the `auto_reply:` block and its Gmail and LinkedIn reply channels, `GmailClient.send_reply` / `get_message_headers`, `linkedin_client.send_message` / `--try-reply`, the `linkedin-try-reply` stage, and `skip_addresses`. They remain in git history at 9ecd45b. Kept: `linkedin-login`, `linkedin-inspect`, `trash_message`. `ActionRuns.target` is `linkedin_ignore` for these rows. The Ignore label ("Ignore <name>'s request to connect") was confirmed by hand on real invitation pages; the automated click is verified only against a local stand-in page.
+
+## 2026-10-10 - Ignore via the profile page's Ignore button
+
+**Type**: fix
+**Files**: src/linkedin_client.py, profiles/task_connection.yaml
+
+On a real invitation profile page Ignore is a button, not a link, so there is no URL to extract. `task_connection` now opens `review_url` (the profile link from the email) and clicks `Ignore` (`linkedin_ignore.click_text`). After the click the step checks the button is gone and otherwise raises, so an unconfirmed ignore is recorded in `ActionRuns.error`. Exercised against a local stand-in page only.
+
+## 2026-10-10 - Reply to declined connection requests on LinkedIn instead of by email
+
+**Type**: feature
+**Files**: src/linkedin_client.py, src/action_dispatch.py, profiles/task_connection.yaml, clearfeed.bat, tests/test_linkedin_client.py, README.md, system_architecture.md
+
+LinkedIn's notification emails have no usable return address, so `auto_reply` gains `channel: linkedin`, now used by `task_connection`. On Decline: `linkedin_client.send_message` opens the invitation's `review_url` in the signed-in browser profile, types the configured body into the message box, sends it, and confirms the composer cleared and the text appears; then the `linkedin_ignore` link is opened and the Gmail message is trashed. If the reply can't be sent and confirmed, nothing else is done and the normal Todoist task is created. After a confirmed send, ignore/trash failures are recorded in `ActionRuns.error` and not retried; `ActionRuns.target` is `linkedin_reply`. `channel: gmail` remains the default.
+
+New `clearfeed.bat linkedin-try-reply "<link>"` types the message in a visible browser without sending. The send flow was exercised only against a local stand-in page: LinkedIn's real page structure (message box name, whether a button must be clicked first, whether `review_url` lands on a replyable page) is unverified.
+
+## 2026-10-10 - Never auto-reply to LinkedIn relay addresses
+
+**Type**: fix
+**Files**: src/action_dispatch.py, profiles/task_connection.yaml, tests/test_action_dispatch.py, README.md, system_architecture.md
+
+Seven prior `task_connection` records were all sent from `invitations@linkedin.com` or `messages-noreply@linkedin.com`. With no Reply-To, the auto-reply would have gone to LinkedIn, never the person, while the email was still trashed and the request ignored. New `auto_reply.skip_addresses` (fnmatch globs) excludes such addresses; if no deliverable address remains, `_handle_auto_reply` returns None having done nothing and the normal Todoist task is created. A message with a Reply-To for a real person still gets the reply. An unusable address previously failed the record; it now falls back to the task too.
+
+## 2026-10-10 - Ignore declined connection requests on LinkedIn
+
+**Type**: feature
+**Files**: src/linkedin_client.py, src/action_dispatch.py, src/config.py, profiles/task_connection.yaml, clearfeed.bat, requirements.txt, .gitignore, tests/test_linkedin_client.py, README.md, system_architecture.md
+
+After the decline reply is sent and the email trashed, `task_connection` opens the request's `decline_url` in a persistent, signed-in Playwright Chromium profile so LinkedIn archives it. New optional `auto_reply.linkedin_ignore` block (`url_key`, `click_text`, `not_url_key`). Sign in once with `clearfeed.bat linkedin-login`.
+
+Only https `linkedin.com` URLs are opened (the URL is LLM-extracted from an email body), and the step is refused if `decline_url` equals `accept_url`. A signed-out session is detected and reported. Failures are recorded in `ActionRuns.error`, not retried, and leave the status `created` because the reply already went out. Verified against a local stand-in page only, not LinkedIn; LinkedIn's terms prohibit automation.
+
+## 2026-10-10 - Auto-reply to and trash declined connection requests
+
+**Type**: feature
+**Files**: src/action_dispatch.py, src/gmail_client.py, profiles/task_connection.yaml, tests/test_action_dispatch.py, tests/test_gmail_reply.py, README.md, system_architecture.md
+
+`task_connection` no longer creates a Todoist task when the prompt's `action` is `Decline`. Instead ClearFeed emails the sender a configurable message (`auto_reply.body` in the profile) as a threaded reply, then moves the original Gmail message to Trash. Other actions (Accept, Review, Respond, Meeting) are unchanged.
+
+New generic `auto_reply:` profile block (per_record mode only) routes matching records to `_handle_auto_reply` in place of the target handler. `ActionRuns.target` is `gmail_reply` for these rows. The trash is message-level (`GmailClient.trash_message`), not thread-level, so the sent reply is not trashed with it. `GmailClient.send_reply` is deliberately not retried. If the send succeeds but the trash fails, the record stays `created` with the error recorded, so it is never re-sent.
+
+Header values are collapsed to one line before use to block header injection from a hostile subject or Message-ID. The Decline Message block inside the `task_connection` LLM prompt is now unused by this path and was left as is.
+
 ## 2026-10-07 - Retry transient Todoist errors; strip NUL bytes before insert
 
 **Type**: fix

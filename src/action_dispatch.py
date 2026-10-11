@@ -40,6 +40,16 @@ YAML profile schema:
       due_string: null
       content: "Respond to {name}"   # {placeholders} resolved
 
+    auto_decline:            # optional, per_record only: replaces the target handler
+      when_key: action       # when the prompt JSON's `action` equals `when_value`, click
+      when_value: Decline    # Ignore on the requester's LinkedIn page and trash the original
+      trash: true            # Gmail message, instead of creating a task. If the ignore
+      linkedin_ignore:       # fails or can't be confirmed, the normal task is created.
+        url_key: review_url  #   prompt JSON key holding the LinkedIn page (https linkedin.com)
+        click_text: "Ignore" #   button on that page to click; it must disappear afterwards
+        delay_seconds: [5, 25]  # optional: wait a random min..max seconds on the page before clicking
+        not_url_key: accept_url  # optional: refuse if the URL equals this key's value
+
     system: |                # optional — static instructions, sent as the system
       ...                    # turn with prompt caching. Must contain NO {placeholders}
                               # (repeat calls only cache-hit if this text is byte-identical
@@ -99,6 +109,7 @@ class ActionResult:
     external_id: str | None = None
     error: str | None = None
     action_content: str | None = None  # aggregate mode: JSON of the action object
+    target: str | None = None  # overrides the profile's target in ActionRuns (e.g. auto-reply)
 
 
 # ------------------------------------------------------------------
@@ -167,7 +178,36 @@ def _load_profile(path: Path) -> dict:
     if validator is not None:
         validator(profile[target])
 
+    if "auto_decline" in profile:
+        _validate_auto_decline(profile)
+
     return profile
+
+
+def _validate_auto_decline(profile: dict) -> None:
+    """Validate the optional `auto_decline:` block."""
+    if profile.get("mode", "per_record") != "per_record":
+        raise ValueError("'auto_decline' is only supported with mode: per_record")
+    cfg = profile["auto_decline"]
+    if not isinstance(cfg, dict):
+        raise ValueError("Profile 'auto_decline' must be a mapping")
+    for field in ("when_key", "when_value"):
+        if not cfg.get(field):
+            raise ValueError(f"Profile auto_decline section missing required field: {field!r}")
+    li = cfg.get("linkedin_ignore")
+    if not isinstance(li, dict) or not li.get("url_key") or not li.get("click_text"):
+        raise ValueError("Profile auto_decline.linkedin_ignore requires 'url_key' and 'click_text'")
+    delay = li.get("delay_seconds")
+    if delay is not None and not (
+        isinstance(delay, list)
+        and len(delay) == 2
+        and all(isinstance(x, (int, float)) and not isinstance(x, bool) for x in delay)
+        and 0 <= delay[0] <= delay[1]
+    ):
+        raise ValueError(
+            "Profile auto_decline.linkedin_ignore 'delay_seconds' must be [min, max] "
+            "with 0 <= min <= max"
+        )
 
 
 # ------------------------------------------------------------------
@@ -351,6 +391,12 @@ def _action_one(
 
     log.info("[action] %s prompt result keys: %s", context, list(prompt_result.keys()))
 
+    if _auto_decline_matches(profile, prompt_result):
+        result = _handle_auto_decline(record, profile, prompt_result, clients)
+        if result is not None:
+            return result
+        log.info("[action] %s could not ignore on LinkedIn — creating the normal task", context)
+
     handler = _TARGET_HANDLERS[profile["target"]]
     return handler(record, profile, prompt_result, clients)
 
@@ -453,6 +499,93 @@ def _handle_playwright(
     routine with `prompt_result` + record fields, then return an ActionResult.
     """
     raise NotImplementedError("playwright target not yet implemented")
+
+
+# ------------------------------------------------------------------
+# Auto-decline — replaces the target handler for records the prompt marks
+# (e.g. action == "Decline"): ignore the request on LinkedIn, trash the email.
+# ------------------------------------------------------------------
+
+_AUTO_DECLINE_TARGET = "linkedin_ignore"
+
+
+def _auto_decline_matches(profile: dict, prompt_result: dict) -> bool:
+    """True when the profile has an `auto_decline` block and the prompt JSON triggers it."""
+    cfg = profile.get("auto_decline")
+    if not cfg:
+        return False
+    actual = prompt_result.get(cfg["when_key"])
+    if actual is None:
+        return False
+    return str(actual).strip().lower() == str(cfg["when_value"]).strip().lower()
+
+
+def _ignore_on_linkedin(li_cfg: dict, prompt_result: dict) -> str | None:
+    """Open the requester's LinkedIn page and click Ignore, confirming it went away.
+
+    Returns an error string, or None on success. Never raises.
+    """
+    url = str(prompt_result.get(li_cfg["url_key"]) or "").strip()
+    if not url:
+        return f"LinkedIn ignore skipped: prompt returned no {li_cfg['url_key']}"
+    not_key = li_cfg.get("not_url_key")
+    if not_key and url == str(prompt_result.get(not_key) or "").strip():
+        return f"LinkedIn ignore refused: {li_cfg['url_key']} equals {not_key}"
+    log.info("[action] opening %s to click %r", url.split("?")[0], li_cfg.get("click_text"))
+    try:
+        from linkedin_client import ignore_invitation
+        ignore_invitation(
+            url,
+            click_text=li_cfg.get("click_text"),
+            click_delay_seconds=li_cfg.get("delay_seconds"),
+        )
+    except Exception as exc:
+        return f"LinkedIn ignore failed: {exc}"
+    return None
+
+
+def _trash_original(record: dict, clients: dict) -> str | None:
+    """Trash the record's Gmail message. Returns an error string, or None on success."""
+    source_ref = record.get("source_ref")
+    if record.get("source_type") != "gmail" or not source_ref:
+        return "trash skipped: record has no Gmail source_ref (select cr.source_type, cr.source_ref)"
+    try:
+        gmail = clients.get("gmail")
+        if gmail is None:
+            from gmail_client import GmailClient
+            gmail = clients["gmail"] = GmailClient()
+        gmail.trash_message(source_ref)
+    except Exception as exc:
+        return f"trash failed: {exc}"
+    return None
+
+
+def _handle_auto_decline(
+    record: dict, profile: dict, prompt_result: dict, clients: dict
+) -> ActionResult | None:
+    """Ignore the request on LinkedIn, then trash the original Gmail message.
+
+    Returns None, having trashed nothing, when the ignore can't be done and
+    confirmed — the caller then creates the normal task so the request is not
+    lost. After a confirmed ignore the result is 'created'; a trash failure is
+    recorded in `error` (the ignore already happened, so it is never retried).
+    """
+    record_id: int = record["id"]
+    cfg: dict = profile["auto_decline"]
+
+    err = _ignore_on_linkedin(cfg["linkedin_ignore"], prompt_result)
+    if err:
+        log.warning("[action] record_id=%d %s", record_id, err)
+        return None
+    log.info("[action] record_id=%d ignored on LinkedIn", record_id)
+
+    error: str | None = None
+    if cfg.get("trash", True):
+        error = _trash_original(record, clients)
+        if error:
+            log.warning("[action] record_id=%d ignored on LinkedIn but %s", record_id, error)
+
+    return ActionResult(record_id, "created", error=error, target=_AUTO_DECLINE_TARGET)
 
 
 # target name → (handler, validator). Adding a capability = add one row.
@@ -658,7 +791,7 @@ def run_action(profile_path: str | Path) -> list[ActionResult]:
             _insert_action_run(
                 profile_name=profile_name,
                 record_id=result.record_id,
-                target=target,
+                target=result.target or target,
                 external_id=result.external_id,
                 status=result.status,
                 error=result.error,
@@ -669,6 +802,8 @@ def run_action(profile_path: str | Path) -> list[ActionResult]:
 
         if result.status == "failed":
             log.error("Record %d: %s", result.record_id, result.error)
+        elif result.error:
+            log.warning("Record %d → %s with error: %s", result.record_id, result.status, result.error)
         else:
             log.info(
                 "Record %d → %s (task_id=%s)",

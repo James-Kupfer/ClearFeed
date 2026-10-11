@@ -179,5 +179,12 @@ TODOIST_TIMEOUT_SECONDS = 15
 # Defaults to "sonnet" — overridden per-profile via the profile's `model` field.
 LLM_ROUTING["action"] = "sonnet"
 
+# --- LinkedIn (browser automation: ignore declined connection requests) ---
+# Persistent Chromium profile holding your LinkedIn session; sign in once with
+# `clearfeed.bat linkedin-login`. Gitignored — it contains session cookies.
+LINKEDIN_BROWSER_PROFILE_DIR = BASE_DIR / "linkedin_profile"
+LINKEDIN_HEADLESS = True
+LINKEDIN_NAV_TIMEOUT_SECONDS = 30
+
 # --- Logging ---
 LOG_RETENTION_DAYS = 90

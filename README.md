@@ -189,6 +189,45 @@ This must be present in `trigger.sql` — `_load_profile` rejects profiles witho
 
 **`priority` in `todoist:` blocks** uses the **human scale (1 = most urgent, 4 = normal)**. `todoist_client.py` inverts it to the Todoist REST API scale (`api_priority = 5 − human_priority`) at the point the request is built. Profiles and prompts never need to express the REST scale.
 
+**Auto-decline (optional, `per_record` only):** an `auto_decline:` block replaces the
+target handler for records whose prompt JSON matches. `profiles/task_connection.yaml`
+uses it so a connection request the prompt marks `action: Decline` is not turned
+into a task: ClearFeed opens the requester's LinkedIn page (`review_url`, the
+"view profile" link from the email) in a signed-in browser profile, clicks
+**Ignore** so LinkedIn archives the request, and moves the original Gmail message
+to Trash. No message is sent to the requester. If the ignore can't be done and
+confirmed, nothing is trashed and the normal task is created instead. All other
+actions still create tasks.
+
+```yaml
+auto_decline:
+  when_key: action          # prompt JSON key to test
+  when_value: Decline       # case-insensitive exact match
+  trash: true               # optional, default true: trash the Gmail message afterwards
+  linkedin_ignore:
+    url_key: review_url     # prompt JSON key holding the LinkedIn page (https linkedin.com only)
+    click_text: "Ignore"    # button to click; it must disappear, else the step counts as failed
+    delay_seconds: [5, 25]  # optional: wait a random min..max seconds on the page before clicking
+    not_url_key: accept_url # optional: refuse if the URL equals this key's value
+```
+
+The trigger SQL must select `cr.source_type` and `cr.source_ref` (the Gmail
+message id). The `ActionRuns` row records `target = linkedin_ignore`. After a
+confirmed ignore, a failed trash is recorded in `ActionRuns.error` and not
+retried (status stays `created`).
+
+**LinkedIn setup.** LinkedIn has no API for this, so `src/linkedin_client.py`
+drives a persistent Chromium profile (`config.LINKEDIN_BROWSER_PROFILE_DIR`,
+gitignored) with Playwright. One-time: `pip install -r requirements.txt`,
+`playwright install chromium`, then `clearfeed.bat linkedin-login` and sign in.
+It only opens https `linkedin.com` URLs and reports a signed-out session instead
+of silently doing nothing. `clearfeed.bat linkedin-inspect` lists a page's buttons
+and boxes step by step (clicks and types nothing) to help find the right
+`click_text` if LinkedIn changes. Automating LinkedIn violates its terms and can
+get the account restricted. The Ignore button's label was confirmed by hand on a
+real invitation page; the automated click was exercised only against a local
+stand-in page.
+
 **Record column names** in `content`/`description` come directly from the SQL `SELECT` column aliases — no separate `inputs:` list. `{placeholders}` also include prompt JSON keys (prompt wins on collision).
 
 ### Export profile (`kind: export`)
@@ -265,6 +304,9 @@ clearfeed.bat ingest
 
 :: Dispatch a digest
 clearfeed.bat dispatch profiles\digest_investment.yaml
+
+:: One full cycle, as the scheduled service runs it (token check, ingest, post-ingest actions)
+clearfeed.bat cycle
 
 :: Run an action profile (per-record tasks)
 clearfeed.bat action profiles\task_connection.yaml
