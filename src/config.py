@@ -172,6 +172,13 @@ TRASH_EXCLUSIONS: list[dict] = [
     {"labels": ["Professional"], "tags": ["inmail"]},
 ]
 
+# Senders whose emails are NOT trashed at ingest (labeled and kept in the inbox).
+# A later stage trashes them once processed — e.g. job_export's `trash_after_export`
+# for LinkedIn job alerts. Case-insensitive substring match against the From header.
+TRASH_DEFERRED_SENDERS: list[str] = [
+    "jobalerts-noreply@linkedin.com",
+]
+
 # --- Todoist ---
 TODOIST_BASE_URL = "https://api.todoist.com/api/v1"
 TODOIST_TIMEOUT_SECONDS = 15

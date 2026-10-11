@@ -201,6 +201,24 @@ def record_exists(source_type: str, source_ref: str) -> bool:
         raise DbError(f"DB error checking record existence: {exc}") from exc
 
 
+def query_gmail_refs(record_ids: list[int], sender_contains: str) -> list[str]:
+    """Return Gmail message ids (source_ref) of the given records whose sender
+    contains `sender_contains` (case-insensitive). Non-Gmail records are ignored."""
+    if not record_ids:
+        return []
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT source_ref FROM ContentRecords "
+                "WHERE id = ANY(%s) AND source_type = 'gmail' AND sender ILIKE %s",
+                (list(record_ids), f"%{sender_contains}%"),
+            )
+            return [row[0] for row in cursor.fetchall()]
+    except psycopg.Error as exc:
+        raise DbError(f"DB error looking up Gmail refs: {exc}") from exc
+
+
 def query_sql(
     sql: str,
     params: tuple = (),

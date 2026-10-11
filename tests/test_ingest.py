@@ -287,6 +287,40 @@ def test_excluded_email_is_kept_not_trashed(mock_gmail, mock_llm):
     mock_gmail.trash_thread.assert_not_called()   # NOT trashed
 
 
+def test_deferred_sender_is_kept_not_trashed(mock_gmail, mock_llm):
+    """A sender in TRASH_DEFERRED_SENDERS is labeled but left in the inbox for a later stage."""
+    mock_gmail.extract_message_parts.return_value = {
+        "subject": "AI architect: Acme and 9 more jobs",
+        "sender": "LinkedIn Job Alerts <jobalerts-noreply@linkedin.com>",
+        "date_str": "",
+        "body_text": "New jobs match your search.",
+        "html_body": "",
+        "image_attachments": [],
+    }
+    mock_llm.call_json.return_value = {
+        "summary": "LinkedIn job alert.",
+        "summary_confidence": 4,
+        "summary_rationale": "Automated alert.",
+        "tags": ["job_search"],
+        "labels": ["Professional"],
+        "classification_confidence": 4,
+        "classification_rationale": "Job alert.",
+    }
+
+    with patch("ingest_gmail.GmailClient", return_value=mock_gmail), patch(
+        "ingest_gmail.LLMClient", return_value=mock_llm
+    ), patch("ingest_gmail.record_exists", return_value=False), patch(
+        "ingest_gmail.insert_content_record", return_value=7
+    ), patch("ingest_gmail._download_images", return_value=[]):
+        from ingest_gmail import run_ingest
+
+        results = run_ingest()
+
+    assert results[0].status == "kept"
+    mock_gmail.apply_labels.assert_called_once()
+    mock_gmail.trash_thread.assert_not_called()
+
+
 def test_security_alert_is_trashed_without_insert(mock_gmail, mock_llm):
     """Security alert subject must trigger immediate trash, no DB insert."""
     mock_gmail.extract_message_parts.return_value = {

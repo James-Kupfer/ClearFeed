@@ -1,5 +1,12 @@
 # Change Log
 
+## 2026-10-11 - Trash LinkedIn job alerts after export
+
+**Type**: feature
+**Files**: src/config.py, src/ingest_gmail.py, src/db.py, src/export.py, profiles/job_export.yaml, tests/test_ingest.py, tests/test_export.py, README.md
+
+Emails from `jobalerts-noreply@linkedin.com` used to be trashed at ingest, before `job_export` ran. New `config.TRASH_DEFERRED_SENDERS` makes ingest label and store them but leave them in the inbox (status `kept`). New optional export-profile block `trash_after_export: {sender}` (set in `job_export.yaml`) trashes the Gmail message of each exported row from that sender after the `.xlsx` is saved, via `db.query_gmail_refs` + `GmailClient.trash_message`. Failures are logged and retried by the next export. A job alert that is not exported (not tagged `job_search`/`recruiter`, or older than the 48 h window) stays in the inbox.
+
 ## 2026-10-10 - Random delay before clicking Ignore
 
 **Type**: feature

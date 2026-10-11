@@ -329,6 +329,9 @@ def _ingest_thread(
                 thread_id, labels, tags,
             )
             return IngestResult(thread_id, "kept", record_id=record_id)
+        if _is_trash_deferred(sender):
+            log.info("Thread %s kept in inbox (trash deferred for sender %s)", thread_id, sender)
+            return IngestResult(thread_id, "kept", record_id=record_id)
 
         try:
             gmail.trash_thread(thread_id)
@@ -430,6 +433,12 @@ def _should_trash(subject: str, sender: str) -> bool:
     """Return True if this email matches known security-alert or promo patterns."""
     text = f"{subject} {sender}"
     return any(pat.search(text) for pat in _TRASH_SUBJECT_PATTERNS)
+
+
+def _is_trash_deferred(sender: str) -> bool:
+    """True if the sender is in config.TRASH_DEFERRED_SENDERS (trashed by a later stage)."""
+    sender = sender.lower()
+    return any(s.lower() in sender for s in config.TRASH_DEFERRED_SENDERS)
 
 
 def _parse_date(date_str: str) -> datetime | None:

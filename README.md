@@ -248,9 +248,13 @@ sql: |
   ORDER BY cr.processed_at DESC LIMIT 500
 output_path: "O:\\...\\Listings"
 filename_template: "job_export_{timestamp}.xlsx"
+trash_after_export:                       # optional
+  sender: jobalerts-noreply@linkedin.com  # case-insensitive substring of the From header
 ```
 
 Column headers in the Excel output are derived from `cursor.description` (the SQL `SELECT` column names/aliases) — no separate `columns:` list.
+
+`trash_after_export` moves the Gmail messages of exported rows from that sender to Trash once the `.xlsx` is saved (requires `cr.id` in the `SELECT`). A trash failure is logged, not raised; the email stays in the inbox and is retried by the next export while its row is still in the query window. Pair it with `TRASH_DEFERRED_SENDERS` in `src/config.py`, which makes ingest leave that sender's emails in the inbox instead of trashing them immediately.
 
 ### Adding a new capability
 

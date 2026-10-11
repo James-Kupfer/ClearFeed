@@ -160,3 +160,88 @@ def test_run_export_query_sql_called_with_profile_sql(tmp_path):
     called_sql = mock_qs.call_args[0][0]
     assert "SELECT" in called_sql
     assert "ContentRecords" in called_sql
+
+
+# ---------------------------------------------------------------------------
+# trash_after_export
+# ---------------------------------------------------------------------------
+
+
+def _write_trash_profile(tmp_path):
+    p = tmp_path / "export_trash.yaml"
+    p.write_text(
+        "kind: export\nname: test_export\n"
+        "sql: SELECT cr.id FROM ContentRecords cr LIMIT 500\n"
+        "output_path: /tmp/exports\n"
+        "trash_after_export:\n  sender: jobalerts-noreply@linkedin.com\n"
+    )
+    return p
+
+
+def test_load_profile_rejects_trash_after_export_without_sender(tmp_path):
+    from export import _load_profile
+
+    p = tmp_path / "bad.yaml"
+    p.write_text(
+        "kind: export\nname: x\nsql: SELECT 1\noutput_path: /tmp\n"
+        "trash_after_export: {}\n"
+    )
+    with pytest.raises(ValueError, match="trash_after_export"):
+        _load_profile(p)
+
+
+def test_run_export_trashes_matching_emails_after_save(tmp_path):
+    from export import run_export
+
+    p = _write_trash_profile(tmp_path)
+    order: list[str] = []
+    gmail = MagicMock()
+    gmail.trash_message.side_effect = lambda ref: order.append(f"trash:{ref}")
+
+    with patch("export.query_sql", return_value=(["id"], [{"id": 1}, {"id": 2}])), \
+         patch("export._save_excel", side_effect=lambda *a, **k: order.append("save")), \
+         patch("export.query_gmail_refs", return_value=["m1", "m2"]) as refs, \
+         patch("gmail_client.GmailClient", return_value=gmail):
+        run_export(p)
+
+    refs.assert_called_once_with([1, 2], "jobalerts-noreply@linkedin.com")
+    assert order == ["save", "trash:m1", "trash:m2"]
+
+
+def test_run_export_does_not_trash_when_not_configured(tmp_path):
+    from export import run_export
+
+    p = _write_valid_profile(tmp_path)
+    with patch("export.query_sql", return_value=(["id"], [{"id": 1}])), \
+         patch("export._save_excel"), \
+         patch("export.query_gmail_refs") as refs:
+        run_export(p)
+
+    refs.assert_not_called()
+
+
+def test_run_export_trash_failure_does_not_raise(tmp_path):
+    from export import run_export
+
+    p = _write_trash_profile(tmp_path)
+    gmail = MagicMock()
+    gmail.trash_message.side_effect = [RuntimeError("boom"), None]
+
+    with patch("export.query_sql", return_value=(["id"], [{"id": 1}, {"id": 2}])), \
+         patch("export._save_excel"), \
+         patch("export.query_gmail_refs", return_value=["m1", "m2"]), \
+         patch("gmail_client.GmailClient", return_value=gmail):
+        run_export(p)
+
+    assert gmail.trash_message.call_count == 2
+
+
+def test_run_export_without_rows_trashes_nothing(tmp_path):
+    from export import run_export
+
+    p = _write_trash_profile(tmp_path)
+    with patch("export.query_sql", return_value=(["id"], [])), \
+         patch("export.query_gmail_refs") as refs:
+        run_export(p)
+
+    refs.assert_not_called()
