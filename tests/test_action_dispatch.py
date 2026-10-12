@@ -940,7 +940,7 @@ def _run_with_heartbeat(
     cycle_note=None,
 ):
     """Run run_action with every external dependency mocked; return the mocks."""
-    import action_dispatch
+    from action_dispatch import ActionResult, run_action
     from db import DbError
 
     def fake_query_sql(sql, *a, **k):
@@ -960,8 +960,8 @@ def _run_with_heartbeat(
          patch("action_dispatch._action_one") as action_one, \
          patch("action_dispatch._insert_action_run"), \
          patch("action_dispatch._create_todoist_task", return_value=create_result) as create:
-        action_one.side_effect = lambda rec, *a: action_dispatch.ActionResult(rec["id"], "created", "t")
-        results = action_dispatch.run_action(
+        action_one.side_effect = lambda rec, *a: ActionResult(rec["id"], "created", "t")
+        results = run_action(
             _heartbeat_profile_file(tmp_path), cycle_note=cycle_note
         )
     return results, claim, release, create
@@ -1023,16 +1023,16 @@ def test_heartbeat_sent_and_escalated_when_trigger_query_fails(tmp_path):
 
 
 def test_heartbeat_escalated_when_a_record_failed(tmp_path):
-    import action_dispatch
+    from action_dispatch import ActionResult, run_action
 
-    failed = action_dispatch.ActionResult(9, "failed", error="LLM error: x")
+    failed = ActionResult(9, "failed", error="LLM error: x")
     with patch("action_dispatch.query_sql", side_effect=lambda sql, *a, **k: [{"records_total": 1}] if "records_total" in sql else [{"id": 9}]), \
          patch("action_dispatch.claim_heartbeat", return_value=True), \
          patch("action_dispatch.TodoistClient"), patch("action_dispatch.LLMClient"), \
          patch("action_dispatch._insert_action_run"), \
          patch("action_dispatch._action_one", return_value=failed), \
          patch("action_dispatch._create_todoist_task", return_value=("t", None)) as create:
-        action_dispatch.run_action(_heartbeat_profile_file(tmp_path))
+        run_action(_heartbeat_profile_file(tmp_path))
     payload = create.call_args[0][0]
     assert payload["priority"] == 1
     assert "#9 LLM error: x" in payload["description"]
@@ -1063,7 +1063,7 @@ def test_heartbeat_claim_released_when_task_creation_fails(tmp_path):
 
 
 def test_heartbeat_sent_when_processing_raises_and_exception_propagates(tmp_path):
-    import action_dispatch
+    from action_dispatch import run_action
 
     with patch("action_dispatch.query_sql", side_effect=lambda sql, *a, **k: [{"records_total": 1}] if "records_total" in sql else [{"id": 1}]), \
          patch("action_dispatch.claim_heartbeat", return_value=True), \
@@ -1071,20 +1071,20 @@ def test_heartbeat_sent_when_processing_raises_and_exception_propagates(tmp_path
          patch("action_dispatch.LLMClient", side_effect=RuntimeError("no api key")), \
          patch("action_dispatch._create_todoist_task", return_value=("t", None)) as create:
         with pytest.raises(RuntimeError, match="no api key"):
-            action_dispatch.run_action(_heartbeat_profile_file(tmp_path))
+            run_action(_heartbeat_profile_file(tmp_path))
     payload = create.call_args[0][0]
     assert payload["priority"] == 1
     assert "no api key" in payload["description"]
 
 
 def test_profile_without_heartbeat_never_claims(tmp_path):
-    import action_dispatch
+    from action_dispatch import run_action
 
     p = tmp_path / "profile.yaml"
     p.write_text(_minimal_profile())
     with patch("action_dispatch.query_sql", return_value=[]), \
          patch("action_dispatch.claim_heartbeat") as claim:
-        action_dispatch.run_action(p)
+        run_action(p)
     claim.assert_not_called()
 
 
@@ -1103,7 +1103,7 @@ def test_orchestrator_runs_action_profiles_when_ingest_raises():
 
 def test_heartbeat_waits_until_after_hour(tmp_path):
     from datetime import datetime
-    import action_dispatch
+    from action_dispatch import run_action
     hb = {"project": "Business", "content": "Check {date}", "after_hour": 20}
     for hour, expect_sent in ((19, False), (20, True)):
         with patch("action_dispatch.now_cst", return_value=datetime(2026, 10, 12, hour, 30)), \
@@ -1111,7 +1111,7 @@ def test_heartbeat_waits_until_after_hour(tmp_path):
              patch("action_dispatch.claim_heartbeat", return_value=True) as claim, \
              patch("action_dispatch.TodoistClient"), \
              patch("action_dispatch._create_todoist_task", return_value=("t", None)) as create:
-            action_dispatch.run_action(_heartbeat_profile_file(tmp_path, hb))
+            run_action(_heartbeat_profile_file(tmp_path, hb))
         assert claim.called is expect_sent
         assert create.called is expect_sent
 
