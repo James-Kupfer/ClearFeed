@@ -1,5 +1,16 @@
 # Change Log
 
+## 2026-10-11 - Trash LinkedIn job alerts after export
+
+**Type**: feature
+**Files**: src/config.py, src/ingest_gmail.py, src/db.py, src/gmail_client.py, src/export.py, profiles/job_export.yaml, tests/test_ingest.py, tests/test_export.py, tests/test_gmail_trash.py, README.md
+
+Emails from `jobalerts-noreply@linkedin.com` used to be trashed at ingest, before `job_export` ran. New `config.TRASH_DEFERRED_SENDERS` makes ingest label and store them but leave them in the inbox (status `kept`). New optional export-profile block `trash_after_export: {sender}` (set in `job_export.yaml`) trashes the Gmail message of each exported row from that sender after the `.xlsx` is saved, via `db.query_gmail_refs` + `GmailClient.trash_message`. The export also sweeps `from:<sender> in:inbox label:ProcessedClearFeed` (`GmailClient.list_message_ids`), including when no rows matched. Reason: Gmail appends repeat alerts to an existing thread, ingest reads only the thread's first message and treats the thread as a duplicate, so it labels the new messages processed but never trashed them (16 such threads found in the inbox). Failures are logged and retried by the next export. 
+
+**Ingest now stores every message of a thread** (follow-up, same day). `_ingest_thread` loops over all messages; each becomes its own record (source_ref = message id) and already-stored messages are skipped, so alerts Gmail appends to an old thread are classified and exported. Stored messages are trashed per message (`trash_message`, not `trash_thread`), so an older kept message in the same thread is untouched; messages that are trash-excluded or from a deferred sender stay in the inbox. Spam and security/promo messages are also trashed per message. If any message fails (e.g. no body), the others are still stored, labeled and trashed, but the thread is not marked ProcessedClearFeed so the failed one is retried. `IngestResult.record_id` is the first newly stored record of the thread.
+
+**One-off backfill**: the 15 inbox threads already holding appended alerts are labeled ProcessedClearFeed, so normal runs skip them. Run `clearfeed.bat ingest --include-processed` once (`fetch_ingest_threads(include_processed=True)` drops the label filter; stored messages are skipped by message id). Do not dry-run it first: a dry run stores the records, and the real run would then see those messages as duplicates and not trash them.
+
 ## 2026-10-10 - Random delay before clicking Ignore
 
 **Type**: feature

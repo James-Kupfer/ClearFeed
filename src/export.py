@@ -20,6 +20,12 @@ Profile schema (YAML):
       ORDER BY cr.processed_at DESC LIMIT 500
     output_path: "O:\\path\\to\\folder"
     filename_template: job_export_{timestamp}.xlsx  # optional
+    trash_after_export:                             # optional
+      sender: jobalerts-noreply@linkedin.com        # case-insensitive substring of the From header
+
+`trash_after_export` moves that sender's Gmail messages to Trash after the export: the
+exported rows' messages, plus any inbox message ingest already marked processed. The SELECT must include `cr.id`. Pair it with
+config.TRASH_DEFERRED_SENDERS so ingest leaves those emails in the inbox.
 """
 
 import argparse
@@ -33,7 +39,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import config  # noqa: F401 — side effect: sets up paths for downstream imports
 from typing import Any
 
-from db import DbError, query_sql
+from db import DbError, query_gmail_refs, query_sql
 from utils import purge_old_logs, read_yaml_profile, setup_logging
 
 log = logging.getLogger(__name__)
@@ -59,6 +65,12 @@ def _load_profile(profile_path: str) -> dict:
     missing = [k for k in required if k not in profile]
     if missing:
         raise ValueError(f"Profile missing required keys: {missing}")
+
+    trash_cfg = profile.get("trash_after_export")
+    if trash_cfg is not None and (
+        not isinstance(trash_cfg, dict) or not str(trash_cfg.get("sender") or "").strip()
+    ):
+        raise ValueError("Profile 'trash_after_export' requires a non-empty 'sender'")
 
     return profile
 
@@ -129,6 +141,47 @@ def _save_excel(
     return dest
 
 
+def _trash_exported_emails(trash_cfg: dict, row_dicts: list[dict]) -> None:
+    """Trash the sender's Gmail messages once their export is done.
+
+    Two sets, de-duplicated: (1) the messages behind the exported rows; (2) every
+    inbox message from the sender that ingest already marked processed. Set 2 covers
+    alerts Gmail appended to an already-ingested thread: ingest only reads a thread's
+    first message, so it labels the thread processed but never trashes them.
+
+    Never raises: a failure leaves the email in the inbox for the next export.
+    """
+    sender = trash_cfg["sender"].strip()
+    refs: list[str] = []
+    record_ids = [r["id"] for r in row_dicts if r.get("id") is not None]
+    if record_ids:
+        try:
+            refs = query_gmail_refs(record_ids, sender)
+        except DbError as exc:
+            log.error("trash_after_export: could not look up exported messages: %s", exc)
+    elif row_dicts:
+        log.warning("trash_after_export: the SELECT has no 'id' column; sweeping only")
+    try:
+        from gmail_client import GmailClient
+        gmail = GmailClient()
+    except Exception as exc:
+        log.error("trash_after_export: Gmail unavailable, nothing trashed: %s", exc)
+        return
+    try:
+        refs += gmail.list_message_ids(f"from:{sender} in:inbox label:{config.PROCESSED_LABEL}")
+    except Exception as exc:
+        log.error("trash_after_export: could not list processed inbox messages: %s", exc)
+    refs = list(dict.fromkeys(refs))
+    trashed = 0
+    for ref in refs:
+        try:
+            gmail.trash_message(ref)
+            trashed += 1
+        except Exception as exc:
+            log.error("trash_after_export: could not trash message %s: %s", ref, exc)
+    log.info("Trashed %d of %d email(s) from %s", trashed, len(refs), sender)
+
+
 def run_export(profile_path: str) -> None:
     """Load profile, query DB, write Excel. Core logic (no sys.exit)."""
     log.info("Loading profile: %s", profile_path)
@@ -140,14 +193,20 @@ def run_export(profile_path: str) -> None:
     rows = [[r[c] for c in col_names] for r in row_dicts]
     log.info("Query returned %d row(s)", len(rows))
 
+    trash_cfg = profile.get("trash_after_export")
     if not rows:
         log.info("No records matched — no Excel file written.")
+        if trash_cfg:
+            _trash_exported_emails(trash_cfg, [])
         return
 
     filename_template: str = profile.get("filename_template", "{profile}_{timestamp}.xlsx")
     output_path: str = profile["output_path"]
     dest = _save_excel(col_names, rows, output_path, filename_template, profile_name)
     log.info("Saved: %s (%d rows)", dest, len(rows))
+
+    if trash_cfg:
+        _trash_exported_emails(trash_cfg, row_dicts)
 
 
 def main() -> None:

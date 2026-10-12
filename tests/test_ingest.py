@@ -112,7 +112,7 @@ def test_empty_body_does_not_label_or_trash(mock_gmail, mock_llm):
 
     assert results[0].status == "failed"
     mock_gmail.apply_labels.assert_not_called()
-    mock_gmail.trash_thread.assert_not_called()
+    mock_gmail.trash_message.assert_not_called()
     mock_insert.assert_not_called()
 
 
@@ -131,7 +131,7 @@ def test_db_error_does_not_label_or_trash(mock_gmail, mock_llm):
 
     assert results[0].status == "failed"
     mock_gmail.apply_labels.assert_not_called()
-    mock_gmail.trash_thread.assert_not_called()
+    mock_gmail.trash_message.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -156,7 +156,7 @@ def test_duplicate_source_ref_is_skipped(mock_gmail, mock_llm):
     # ProcessedClearFeed label applied to prevent re-fetching
     mock_gmail.apply_labels.assert_called_once_with("thread_001", ["Label_10"])
     # Thread must not be trashed
-    mock_gmail.trash_thread.assert_not_called()
+    mock_gmail.trash_message.assert_not_called()
     # DB insert must not be called
     mock_insert.assert_not_called()
 
@@ -167,7 +167,7 @@ def test_duplicate_source_ref_is_skipped(mock_gmail, mock_llm):
 
 
 def test_successful_ingest_applies_labels_then_trashes(mock_gmail, mock_llm):
-    """Happy path: DB insert succeeds, labels applied, then thread trashed."""
+    """Happy path: DB insert succeeds, labels applied, then the message trashed."""
     with patch("ingest_gmail.GmailClient", return_value=mock_gmail), patch(
         "ingest_gmail.LLMClient", return_value=mock_llm
     ), patch("ingest_gmail.record_exists", return_value=False), patch(
@@ -180,11 +180,11 @@ def test_successful_ingest_applies_labels_then_trashes(mock_gmail, mock_llm):
     assert results[0].status == "ingested"
     assert results[0].record_id == 42
     mock_gmail.apply_labels.assert_called_once()
-    mock_gmail.trash_thread.assert_called_once_with("thread_001")
+    mock_gmail.trash_message.assert_called_once_with("msg_001")
 
     # Labels must be applied BEFORE trash
     label_call_idx = [c[0] for c in mock_gmail.method_calls].index("apply_labels")
-    trash_call_idx = [c[0] for c in mock_gmail.method_calls].index("trash_thread")
+    trash_call_idx = [c[0] for c in mock_gmail.method_calls].index("trash_message")
     assert label_call_idx < trash_call_idx
 
 
@@ -284,7 +284,41 @@ def test_excluded_email_is_kept_not_trashed(mock_gmail, mock_llm):
     assert results[0].status == "kept"
     assert results[0].record_id == 5
     mock_gmail.apply_labels.assert_called_once()  # labels applied
-    mock_gmail.trash_thread.assert_not_called()   # NOT trashed
+    mock_gmail.trash_message.assert_not_called()   # NOT trashed
+
+
+def test_deferred_sender_is_kept_not_trashed(mock_gmail, mock_llm):
+    """A sender in TRASH_DEFERRED_SENDERS is labeled but left in the inbox for a later stage."""
+    mock_gmail.extract_message_parts.return_value = {
+        "subject": "AI architect: Acme and 9 more jobs",
+        "sender": "LinkedIn Job Alerts <jobalerts-noreply@linkedin.com>",
+        "date_str": "",
+        "body_text": "New jobs match your search.",
+        "html_body": "",
+        "image_attachments": [],
+    }
+    mock_llm.call_json.return_value = {
+        "summary": "LinkedIn job alert.",
+        "summary_confidence": 4,
+        "summary_rationale": "Automated alert.",
+        "tags": ["job_search"],
+        "labels": ["Professional"],
+        "classification_confidence": 4,
+        "classification_rationale": "Job alert.",
+    }
+
+    with patch("ingest_gmail.GmailClient", return_value=mock_gmail), patch(
+        "ingest_gmail.LLMClient", return_value=mock_llm
+    ), patch("ingest_gmail.record_exists", return_value=False), patch(
+        "ingest_gmail.insert_content_record", return_value=7
+    ), patch("ingest_gmail._download_images", return_value=[]):
+        from ingest_gmail import run_ingest
+
+        results = run_ingest()
+
+    assert results[0].status == "kept"
+    mock_gmail.apply_labels.assert_called_once()
+    mock_gmail.trash_message.assert_not_called()
 
 
 def test_security_alert_is_trashed_without_insert(mock_gmail, mock_llm):
@@ -309,7 +343,122 @@ def test_security_alert_is_trashed_without_insert(mock_gmail, mock_llm):
 
     assert results[0].status == "trashed"
     mock_insert.assert_not_called()
-    mock_gmail.trash_thread.assert_called_once()
+    mock_gmail.trash_message.assert_called_once_with("msg_001")
+
+
+# ---------------------------------------------------------------------------
+# Multi-message threads: every message is ingested, not just the first
+# ---------------------------------------------------------------------------
+
+
+def _msg(msg_id):
+    return {"id": msg_id, "payload": {"headers": [], "mimeType": "text/plain", "body": {}, "parts": []}}
+
+
+def _parts(subject="Alert", sender="alerts@example.com", body="body"):
+    return {
+        "subject": subject, "sender": sender, "date_str": "",
+        "body_text": body, "html_body": "", "image_attachments": [],
+    }
+
+
+def _run_thread(mock_gmail, mock_llm, *, exists, insert=None, parts=None):
+    """Run one thread through run_ingest with record_exists answering per message id."""
+    if parts is not None:
+        mock_gmail.extract_message_parts.side_effect = parts
+    insert_patch = patch(
+        "ingest_gmail.insert_content_record",
+        **({"side_effect": insert} if insert else {"return_value": 1}),
+    )
+    with patch("ingest_gmail.GmailClient", return_value=mock_gmail), patch(
+        "ingest_gmail.LLMClient", return_value=mock_llm
+    ), patch("ingest_gmail.record_exists", side_effect=lambda t, ref: ref in exists), \
+         insert_patch as mock_insert, patch("ingest_gmail._download_images", return_value=[]):
+        from ingest_gmail import run_ingest
+
+        return run_ingest(), mock_insert
+
+
+def test_new_message_in_ingested_thread_is_stored_and_trashed(mock_gmail, mock_llm):
+    """Message 2 was appended to a thread whose message 1 is already stored."""
+    mock_gmail.get_thread_messages.return_value = [_msg("m1"), _msg("m2")]
+    results, mock_insert = _run_thread(
+        mock_gmail, mock_llm, exists={"m1"}, insert=[11], parts=lambda msgs: _parts()
+    )
+
+    assert results[0].status == "ingested"
+    assert results[0].record_id == 11
+    assert mock_insert.call_count == 1
+    assert mock_insert.call_args[0][0].source_ref == "m2"
+    mock_gmail.trash_message.assert_called_once_with("m2")  # m1 not touched again
+    mock_gmail.trash_thread.assert_not_called()
+
+
+def test_every_new_message_in_a_thread_gets_a_record(mock_gmail, mock_llm):
+    mock_gmail.get_thread_messages.return_value = [_msg("m1"), _msg("m2"), _msg("m3")]
+    results, mock_insert = _run_thread(
+        mock_gmail, mock_llm, exists=set(), insert=[1, 2, 3], parts=lambda msgs: _parts()
+    )
+
+    assert [c[0][0].source_ref for c in mock_insert.call_args_list] == ["m1", "m2", "m3"]
+    assert [c.args[0] for c in mock_gmail.trash_message.call_args_list] == ["m1", "m2", "m3"]
+    assert results[0].record_id == 1
+
+
+def test_all_messages_duplicate_labels_only(mock_gmail, mock_llm):
+    mock_gmail.get_thread_messages.return_value = [_msg("m1"), _msg("m2")]
+    results, mock_insert = _run_thread(
+        mock_gmail, mock_llm, exists={"m1", "m2"}, parts=lambda msgs: _parts()
+    )
+
+    assert results[0].status == "duplicate"
+    mock_insert.assert_not_called()
+    mock_gmail.trash_message.assert_not_called()
+    mock_gmail.apply_labels.assert_called_once_with("thread_001", ["Label_10"])
+
+
+def test_failed_message_stores_others_but_leaves_thread_unprocessed(mock_gmail, mock_llm):
+    """m2 has no body: m1 is stored and trashed, but the thread is not marked processed."""
+    mock_gmail.get_thread_messages.return_value = [_msg("m1"), _msg("m2")]
+    bodies = {"m1": "text", "m2": ""}
+    results, _ = _run_thread(
+        mock_gmail, mock_llm, exists=set(), insert=[7],
+        parts=lambda msgs: _parts(body=bodies[msgs[0]["id"]]),
+    )
+
+    assert results[0].status == "failed"
+    assert results[0].record_id == 7
+    mock_gmail.trash_message.assert_called_once_with("m1")
+    (_, label_ids), _kw = mock_gmail.apply_labels.call_args
+    assert "Label_10" not in label_ids  # ProcessedClearFeed withheld so m2 is retried
+
+
+def test_kept_message_is_not_trashed_but_sibling_is(mock_gmail, mock_llm):
+    mock_gmail.get_thread_messages.return_value = [_msg("m1"), _msg("m2")]
+    senders = {"m1": "LinkedIn Job Alerts <jobalerts-noreply@linkedin.com>", "m2": "a@example.com"}
+    results, _ = _run_thread(
+        mock_gmail, mock_llm, exists=set(), insert=[1, 2],
+        parts=lambda msgs: _parts(sender=senders[msgs[0]["id"]]),
+    )
+
+    assert results[0].status == "kept"
+    mock_gmail.trash_message.assert_called_once_with("m2")
+
+
+def test_fetch_ingest_threads_include_processed_drops_label_filter():
+    from unittest.mock import MagicMock, patch
+    import gmail_client
+
+    service = MagicMock()
+    listing = service.users.return_value.threads.return_value.list
+    listing.return_value.execute.return_value = {"threads": []}
+    with patch.object(gmail_client, "_build_service", return_value=service):
+        gmail_client.GmailClient().fetch_ingest_threads(include_processed=True)
+        gmail_client.GmailClient().fetch_ingest_threads()
+
+    queries = [c.kwargs["q"] for c in listing.call_args_list]
+    assert "-label:ProcessedClearFeed" not in queries[0]       # include_processed inbox query
+    assert "-label:ProcessedClearFeed" in queries[2]           # default inbox query
 
 
 # ---------------------------------------------------------------------------

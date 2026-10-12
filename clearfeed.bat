@@ -3,6 +3,7 @@
 ::   clearfeed.bat ingest
 ::   clearfeed.bat ingest --dry-run
 ::   clearfeed.bat ingest --dry-run --limit 5
+::   clearfeed.bat ingest --include-processed   (one-off backfill of messages earlier runs labeled without storing)
 ::   clearfeed.bat cycle   (one full pass: token check, ingest, then the post_ingest_actions profiles)
 ::   clearfeed.bat dispatch profiles\investment_digest.yaml
 ::   clearfeed.bat action  profiles\task_connection.yaml

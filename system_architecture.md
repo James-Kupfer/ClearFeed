@@ -15,7 +15,7 @@ schedulable. PostgreSQL (`clearfeed`, local) is the shared source of truth.
                  ┌──────────────┐
  Gmail inbox ───►│ ingest_gmail │── summarize (Haiku) ─► classify (Haiku, may escalate)
                  └──────┬───────┘
-                        ▼  writes ContentRecords (+ RecordTerms), trashes thread
+                        ▼  writes ContentRecords (+ RecordTerms) per message, trashes messages
                  PostgreSQL: clearfeed
                         │
    ┌────────────────────┼─────────────────────┬───────────────────────┐
@@ -34,7 +34,7 @@ writes DigestRuns   target handler;                                   │
 
 | Stage | Entry | Reads | Writes |
 |-------|-------|-------|--------|
-| Ingest | `ingest_gmail.run_ingest` | Gmail | `ContentRecords`, `RecordTerms`; trashes thread |
+| Ingest | `ingest_gmail.run_ingest` | Gmail | `ContentRecords`, `RecordTerms` (one per message); trashes messages |
 | Digest | `dispatch.run_dispatch` | `ContentRecords`, `DigestRuns` | email; `DigestRuns` |
 | Action | `action_dispatch.run_action` | `ContentRecords`, `ActionRuns` | external task; `ActionRuns` |
 | Export | `export.run_export` | `ContentRecords` | `.xlsx` |

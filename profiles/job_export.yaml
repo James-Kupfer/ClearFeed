@@ -13,3 +13,7 @@ sql: |
   ORDER BY cr.processed_at DESC LIMIT 500
 output_path: O:\OneDrive\Claude\My Coworker\Job Search\Listings
 filename_template: job_export_{timestamp}.xlsx
+# After the .xlsx is saved, trash these senders' Gmail messages. Ingest leaves them
+# in the inbox via config.TRASH_DEFERRED_SENDERS.
+trash_after_export:
+  sender: jobalerts-noreply@linkedin.com
