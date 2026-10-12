@@ -1,5 +1,12 @@
 # Change Log
 
+## 2026-10-12 - Shorter task titles for Review and Meeting connection tasks
+
+**Type**: change
+**Files**: profiles/task_connection.yaml
+
+`task_connection` task titles: Review → "Connection request - <name>" (was "Review connection request from <name>"); Meeting → "Meeting request - <name>" (was "Propose meeting time with <name>"). Accept, Decline and Respond titles are unchanged. Nothing in `src/` parses these titles.
+
 ## 2026-10-12 - Daily heartbeat for task_rights_offering; action profiles run when Gmail ingest fails
 
 **Type**: fix

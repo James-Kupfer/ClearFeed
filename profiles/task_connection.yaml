@@ -176,9 +176,9 @@ system: |
     "task_content"        — the Todoist task title, phrased per action:
                               Accept   → "Accept connection from <name>"
                               Decline  → "Decline connection from <name>"
-                              Review   → "Review connection request from <name>"
+                              Review   → "Connection request - <name>"
                               Respond  → "Respond to message from <name>"
-                              Meeting  → "Propose meeting time with <name>"
+                              Meeting  → "Meeting request - <name>"
                             Substitute the actual name for <name> — do not leave
                             the placeholder literally in the output.
     "intro_message"       — extracted per Step 2.
