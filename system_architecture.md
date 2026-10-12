@@ -47,6 +47,7 @@ writes DigestRuns   target handler;                                   │
 | `ContentRecords` | One row per ingested item: sender/subject/body, `summary`, `executive_summary`, confidence/rationale, `enrichment_status`, timestamps |
 | `RecordTerms` | Label/tag terms per record (`kind` ∈ {label, tag}); joined for filtering |
 | `DigestRuns` | One row per digest send: profile, period, summary HTML, content/prior-digest ids |
+| `HeartbeatRuns` | One row per `(profile_name, US-Central date)`: claims the day's heartbeat task. Created on first use by `db.claim_heartbeat` |
 | `ActionRuns` | One row per action attempt: `(profile_name, record_id)` UNIQUE → idempotency; `target`, `external_id`, `status`, `action_content` (aggregate mode: stores the action JSON for prior-action context) |
 | `SourceDocuments` | Full original source, untruncated: `raw_html` / `raw_text`, shared PK with `ContentRecords` (1:1). Captured at ingest before stripping/truncation |
 
@@ -124,6 +125,7 @@ prompt — the two action-digest profiles each carry their own copy.)
 | **Add an action (existing target)** | New `profiles/<name>.yaml` (`kind: action`, `target: todoist`). SQL in `trigger.sql` must contain `{{dedup}}`. Add to `orchestration/ingest.yaml` `post_ingest_actions` and/or a task XML. No code. |
 | **Add an aggregate action** | Same as above but add `mode: aggregate`. Prompt receives `{records_json}` and `{prior_actions_json}`; must return `{"actions": [...]}` with `record_ids`. Set `trigger.prior_actions_hours` to control lookback for prior-action context. |
 | **Ignore on LinkedIn and trash instead of a task** | Add an `auto_decline:` block (`when_key`, `when_value`, `linkedin_ignore.{url_key,click_text}`, optional `trash`) to a `per_record` action profile and select `cr.source_type, cr.source_ref` in `trigger.sql`. `action_dispatch._action_one` routes matching records to `_handle_auto_decline` instead of the target handler; if the ignore fails the normal handler runs. See `profiles/task_connection.yaml`. |
+| **Get a daily "it ran" task from an action profile** | Add a `heartbeat:` block (`project`, `content`, optional `stats_sql`) to a `target: todoist` profile. `action_dispatch.run_action` creates one task per US-Central day on every exit path; the day is claimed in `HeartbeatRuns` via `db.claim_heartbeat`. See `profiles/task_rights_offering.yaml`. |
 | **Add an action target (e.g. Playwright)** | In `action_dispatch.py`: write `_handle_playwright(record, profile, prompt_result, clients)` returning `ActionResult`; write `_validate_playwright(cfg)`; register both in `_TARGET_HANDLERS` / `_TARGET_VALIDATORS`; if it needs a client, add a factory to `_TARGET_CLIENTS`. Profiles then use `target: playwright` + a `playwright:` config block. **Pipeline, launchers, and tasks are untouched.** |
 | **Expose new ContentRecord columns to action prompts** | Add the column to the `SELECT` list in the profile's `trigger.sql`. No code. |
 | **Expose new ContentRecord columns to digest LLM** | Add the column to the `SELECT` in the profile's `sql:` band. Render it in `dispatch._build_prompt` only if it needs special formatting beyond the default row rendering. |

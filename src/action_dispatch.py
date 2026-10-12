@@ -50,6 +50,17 @@ YAML profile schema:
         delay_seconds: [5, 25]  # optional: wait a random min..max seconds on the page before clicking
         not_url_key: accept_url  # optional: refuse if the URL equals this key's value
 
+    heartbeat:               # optional: one Todoist task per US-Central day confirming the
+      project: "Business"    # profile ran, even when no records were found or the run failed.
+      section: "Rights Offerings"  # optional
+      content: "Rights offering check {date}: {headline}"  # {date} {headline}
+      priority: 4            # normal-day priority (default 4)
+      alert_priority: 1      # used when the run errored/failed or the cycle reported a problem (default 1)
+      labels: [clearfeed]
+      due_string: "today"
+      stats_sql: |           # optional: one-row query; each column is listed in the task body
+        SELECT COUNT(*) AS records_total FROM ContentRecords cr WHERE ...
+
     system: |                # optional — static instructions, sent as the system
       ...                    # turn with prompt caching. Must contain NO {placeholders}
                               # (repeat calls only cache-hit if this text is byte-identical
@@ -89,11 +100,19 @@ from typing import Any
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import config
-from db import DbError, get_connection, query_sql, query_prior_actions
+from db import (
+    DbError,
+    claim_heartbeat,
+    get_connection,
+    query_prior_actions,
+    query_sql,
+    release_heartbeat,
+)
 from llm_client import LLMClient
 from todoist_client import TodoistClient, TodoistError
 from utils import (
     normalize_tag,
+    now_cst,
     purge_old_logs,
     read_yaml_profile,
     setup_logging,
@@ -181,7 +200,25 @@ def _load_profile(path: Path) -> dict:
     if "auto_decline" in profile:
         _validate_auto_decline(profile)
 
+    if "heartbeat" in profile:
+        _validate_heartbeat(profile)
+
     return profile
+
+
+def _validate_heartbeat(profile: dict) -> None:
+    """Validate the optional `heartbeat:` block."""
+    if profile["target"] != "todoist":
+        raise ValueError("'heartbeat' is only supported with target: todoist")
+    cfg = profile["heartbeat"]
+    if not isinstance(cfg, dict):
+        raise ValueError("Profile 'heartbeat' must be a mapping")
+    for field in ("project", "content"):
+        if not cfg.get(field):
+            raise ValueError(f"Profile heartbeat section missing required field: {field!r}")
+    stats_sql = cfg.get("stats_sql")
+    if stats_sql is not None and not isinstance(stats_sql, str):
+        raise ValueError("Profile heartbeat 'stats_sql' must be a string")
 
 
 def _validate_auto_decline(profile: dict) -> None:
@@ -741,38 +778,31 @@ def _run_aggregate(
     return list(id_to_result.values())
 
 
-def run_action(profile_path: str | Path) -> list[ActionResult]:
-    """Run the full action-dispatch pipeline for the given YAML profile.
+def _process_records(
+    profile: dict, outcome: dict, clients: dict
+) -> list[ActionResult]:
+    """Scan for pending records, run the pipeline, and record outcomes in ActionRuns.
 
-    Loads profile, scans DB for pending records, runs per-record prompt + task
-    creation, records outcomes in ActionRuns. Returns per-record results.
+    Fills `outcome["found"]` and `outcome["error"]` as it goes so a heartbeat can
+    report even when this raises part-way through.
     """
-    path = Path(profile_path)
-    if not path.is_absolute():
-        path = config.BASE_DIR / path
-
-    profile = _load_profile(path)
     profile_name: str = profile["name"]
     target: str = profile["target"]
-
     mode: str = profile.get("mode", "per_record")
-    log.info(
-        "Action dispatch starting: profile=%s target=%s mode=%s",
-        profile_name, target, mode,
-    )
 
     try:
         records = _query_pending_records(profile)
     except DbError as exc:
         log.error("Failed to query pending records: %s", exc)
+        outcome["error"] = f"Could not query pending records: {exc}"
         return []
 
+    outcome["found"] = len(records)
     log.info("Found %d record(s) for profile %r", len(records), profile_name)
     if not records:
         return []
 
     llm = LLMClient()
-    clients: dict = {}
     client_factory = _TARGET_CLIENTS.get(target)
     if client_factory is not None:
         clients[target] = client_factory()
@@ -818,6 +848,160 @@ def run_action(profile_path: str | Path) -> list[ActionResult]:
         created, skipped, failed,
     )
     return results
+
+
+# ------------------------------------------------------------------
+# Heartbeat — one task per day confirming the profile ran
+# ------------------------------------------------------------------
+
+
+def _heartbeat_stats(stats_sql: str | None) -> tuple[list[str], str | None]:
+    """Run the heartbeat `stats_sql`. Returns (bullet lines, error or None)."""
+    if not stats_sql:
+        return [], None
+    try:
+        rows = query_sql(stats_sql)
+    except Exception as exc:
+        return [], f"Feed stats query failed: {exc}"
+    if not rows:
+        return [], None
+    return [f"- {key}: {'none' if val is None else val}" for key, val in rows[0].items()], None
+
+
+def _build_heartbeat(
+    profile: dict,
+    results: list[ActionResult],
+    outcome: dict,
+    cycle_note: str | None,
+) -> dict:
+    """Build the Todoist payload for the daily heartbeat task."""
+    cfg: dict = profile["heartbeat"]
+    created = sum(1 for r in results if r.status == "created")
+    skipped = sum(1 for r in results if r.status == "skipped")
+    failed = sum(1 for r in results if r.status == "failed")
+
+    stats_lines, stats_error = _heartbeat_stats(cfg.get("stats_sql"))
+
+    problems: list[str] = []
+    if outcome.get("error"):
+        problems.append(outcome["error"])
+    if failed:
+        problems.append(f"{failed} record(s) failed: " + "; ".join(
+            f"#{r.record_id} {r.error}" for r in results if r.status == "failed"
+        ))
+    if cycle_note:
+        problems.append(cycle_note)
+    if stats_error:
+        problems.append(stats_error)
+
+    if problems:
+        headline = "NEEDS ATTENTION"
+    elif created:
+        headline = f"{created} task(s) created"
+    else:
+        headline = "no new records"
+
+    lines = [
+        f"**Status:** {'NEEDS ATTENTION' if problems else 'OK'}",
+        f"- Profile: {profile['name']}",
+        f"- Ran at: {now_cst():%b %d, %Y %H:%M} CT (first run of the day)",
+        f"- New records found: {outcome.get('found', 0)} "
+        f"(created {created}, skipped {skipped}, failed {failed})",
+    ]
+    if problems:
+        lines += ["", "**Problems**"] + [f"- {p}" for p in problems]
+    if stats_lines:
+        lines += ["", "**Feed status**"] + stats_lines
+
+    namespace = {"date": now_cst().strftime("%b %d"), "headline": headline}
+    return {
+        "project": cfg["project"],
+        "section": cfg.get("section"),
+        "content": _render_template(cfg["content"], namespace),
+        "description": "\n".join(lines),
+        "priority": cfg.get("alert_priority", 1) if problems else cfg.get("priority", 4),
+        "labels": cfg.get("labels") or [],
+        "due_date": None,
+        "due_string": cfg.get("due_string"),
+        "reminder_minutes": None,
+    }
+
+
+def _send_heartbeat(
+    profile: dict,
+    results: list[ActionResult],
+    outcome: dict,
+    clients: dict,
+    cycle_note: str | None,
+) -> None:
+    """Create today's heartbeat task if none exists yet. Never raises.
+
+    The day is claimed in the DB before the task is created, so concurrent or
+    repeated cycles cannot duplicate it; a failed creation releases the claim so
+    the next cycle retries.
+    """
+    name = profile["name"]
+    try:
+        if not claim_heartbeat(name):
+            return
+    except DbError as exc:
+        log.error("[heartbeat] %s: could not check today's heartbeat: %s", name, exc)
+        return
+
+    try:
+        payload = _build_heartbeat(profile, results, outcome, cycle_note)
+        local_clients = dict(clients)
+        if "todoist" not in local_clients:
+            local_clients["todoist"] = TodoistClient()
+        task_id, error = _create_todoist_task(payload, local_clients)
+    except Exception as exc:
+        task_id, error = None, str(exc)
+
+    if error:
+        log.error("[heartbeat] %s: task creation failed: %s", name, error)
+        try:
+            release_heartbeat(name)
+        except DbError as exc:
+            log.error("[heartbeat] %s: could not release today's claim: %s", name, exc)
+        return
+    log.info("[heartbeat] %s: created task %s", name, task_id)
+
+
+def run_action(
+    profile_path: str | Path, cycle_note: str | None = None
+) -> list[ActionResult]:
+    """Run the full action-dispatch pipeline for the given YAML profile.
+
+    Loads profile, scans DB for pending records, runs per-record prompt + task
+    creation, records outcomes in ActionRuns. Returns per-record results.
+
+    If the profile has a `heartbeat:` block, a daily confirmation task is created
+    on every exit path (no records, query failure, exception). `cycle_note` is a
+    problem reported by the caller (e.g. the ingest stage failed) and is included
+    in that task.
+    """
+    path = Path(profile_path)
+    if not path.is_absolute():
+        path = config.BASE_DIR / path
+
+    profile = _load_profile(path)
+    log.info(
+        "Action dispatch starting: profile=%s target=%s mode=%s",
+        profile["name"], profile["target"], profile.get("mode", "per_record"),
+    )
+
+    results: list[ActionResult] = []
+    outcome: dict = {"found": 0, "error": None}
+    clients: dict = {}
+    try:
+        results = _process_records(profile, outcome, clients)
+        return results
+    except Exception as exc:
+        outcome["error"] = f"{type(exc).__name__}: {exc}"
+        raise
+    finally:
+        if "heartbeat" in profile:
+            _send_heartbeat(profile, results, outcome, clients, cycle_note)
 
 
 if __name__ == "__main__":

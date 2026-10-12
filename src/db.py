@@ -544,6 +544,47 @@ def has_digest_run_since(profile_name: str, since: datetime) -> bool:
         raise DbError(f"DB error checking digest run since {since}: {exc}") from exc
 
 
+def claim_heartbeat(profile_name: str) -> bool:
+    """Atomically claim today's (US Central) heartbeat slot for a profile.
+
+    Returns True if this call claimed it (caller should send the heartbeat),
+    False if one was already claimed today. The table is created on first use so
+    existing databases need no manual migration.
+    """
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""CREATE TABLE IF NOT EXISTS HeartbeatRuns (
+                        profile_name VARCHAR(100) NOT NULL,
+                        run_date     DATE         NOT NULL,
+                        created_at   TIMESTAMP    NOT NULL DEFAULT {_CST_NOW},
+                        PRIMARY KEY (profile_name, run_date)
+                    )"""
+            )
+            cursor.execute(
+                f"INSERT INTO HeartbeatRuns (profile_name, run_date) "
+                f"VALUES (%s, {_CST_NOW}::date) ON CONFLICT DO NOTHING",
+                (profile_name,),
+            )
+            return cursor.rowcount == 1
+    except psycopg.Error as exc:
+        raise DbError(f"DB error claiming heartbeat for {profile_name}: {exc}") from exc
+
+
+def release_heartbeat(profile_name: str) -> None:
+    """Release today's heartbeat claim so the next cycle retries (task creation failed)."""
+    try:
+        with get_connection() as conn:
+            conn.cursor().execute(
+                f"DELETE FROM HeartbeatRuns WHERE profile_name = %s "
+                f"AND run_date = {_CST_NOW}::date",
+                (profile_name,),
+            )
+    except psycopg.Error as exc:
+        raise DbError(f"DB error releasing heartbeat for {profile_name}: {exc}") from exc
+
+
 def insert_digest_run(
     profile_name: str,
     period_start: datetime,

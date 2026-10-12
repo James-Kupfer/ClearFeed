@@ -228,6 +228,29 @@ get the account restricted. The Ignore button's label was confirmed by hand on a
 real invitation page; the automated click was exercised only against a local
 stand-in page.
 
+**Daily heartbeat (optional, `target: todoist`):** a `heartbeat:` block makes the profile
+create one Todoist task per US-Central day, on its first run of the day, confirming it
+ran. It is created even when no records were found, when the trigger query failed, or
+when the run raised. Normal days use `priority` (default 4); if the run errored, a
+record failed, the cycle reported a problem (e.g. Gmail ingest failed), or `stats_sql`
+failed, it uses `alert_priority` (default 1) and the title says `NEEDS ATTENTION`.
+`profiles/task_rights_offering.yaml` uses it. The day is claimed in the `HeartbeatRuns`
+table (created on first use) before the task is made, so repeated cycles never duplicate
+it; if task creation fails the claim is released and the next cycle retries.
+
+```yaml
+heartbeat:
+  project: "Business"
+  section: "Rights Offerings"                        # optional
+  content: "Rights offering check {date}: {headline}" # {date}, {headline}
+  priority: 4
+  alert_priority: 1
+  labels: [clearfeed]
+  due_string: "today"
+  stats_sql: |        # optional one-row query; each column becomes a line in the task body
+    SELECT COUNT(*) AS records_total FROM ContentRecords cr WHERE ...
+```
+
 **Record column names** in `content`/`description` come directly from the SQL `SELECT` column aliases — no separate `inputs:` list. `{placeholders}` also include prompt JSON keys (prompt wins on collision).
 
 ### Export profile (`kind: export`)
