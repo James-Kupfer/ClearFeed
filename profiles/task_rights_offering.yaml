@@ -35,6 +35,35 @@ todoist:
     [EDGAR Filing]({linked_article_url})
     *task_rights_offering v2*
 
+# --- Daily heartbeat ---
+# One task per US-Central day, created on the first run of the day whether or not
+# any rights offering was found, and even if the run errored. It confirms this
+# profile ran and shows the state of the upstream feed. Priority is raised to P1
+# when the run failed, so a quiet day (P4) is distinguishable from a broken one.
+# after_hour: SEC Updates (SEC_Monitor then Rights_Offering_Monitor) runs weekdays at
+# 19:00 CT, so the heartbeat waits until the first cycle after 20:00 CT to report on it.
+# not_complete counts feed records that never reached enrichment_status='complete'
+# (the trigger above ignores them).
+heartbeat:
+  project: "Business"
+  section: "Rights Offerings"
+  content: "Rights offering check {date}: {headline}"
+  priority: 4
+  after_hour: 20
+  alert_priority: 1
+  labels:
+    - clearfeed
+  due_string: "today"
+  stats_sql: |
+    SELECT COUNT(*) AS records_total,
+           COUNT(*) FILTER (WHERE cr.enrichment_status <> 'complete') AS not_complete,
+           COUNT(*) FILTER (WHERE cr.ingested_at >=
+               (now() AT TIME ZONE 'America/Chicago') - interval '24 hours') AS ingested_last_24h,
+           MAX(cr.received_at) AS latest_received_at,
+           MAX(cr.ingested_at) AS latest_ingested_at
+    FROM ContentRecords cr
+    WHERE cr.source_type = 'SEC_Edgar_rights_offering'
+
 # --- Prompt ---
 # `system` is fully static (no {placeholders}) so it's prompt-cached across every
 # record this profile processes in a run. `prompt` holds only the per-record

@@ -1,5 +1,18 @@
 # Change Log
 
+## 2026-10-12 - Daily heartbeat for task_rights_offering; action profiles run when Gmail ingest fails
+
+**Type**: fix
+**Files**: src/action_dispatch.py, src/ingest_orchestrator.py, src/db.py, schema_postgres.sql, profiles/task_rights_offering.yaml, tests/test_action_dispatch.py, README.md, system_architecture.md
+
+Rights-offering task creation stopped with no signal: a run that found no records only logged "Found 0 record(s)", so a broken run and a quiet day looked identical. New optional `heartbeat:` profile block creates one Todoist task per US-Central day on the profile's first run of the day, whether it found nothing, failed to query, or raised. It lists records found/created/failed, any error, and the output of an optional `stats_sql` (for `task_rights_offering`: feed record count, how many never reached `enrichment_status = 'complete'`, records ingested in the last 24 h, latest `received_at`/`ingested_at`). Quiet days are P4; any problem is P1 with `NEEDS ATTENTION` in the title. The day is claimed in the new `HeartbeatRuns` table (auto-created on first use) before the task is made; a failed creation releases the claim so the next cycle retries. If the claim itself fails (DB error) no heartbeat is sent that cycle.
+
+Optional `after_hour` (US-Central, 0-23) delays the heartbeat until the first cycle at or after that hour; `task_rights_offering` uses 20 so the task is sent after the 19:00 weekday SEC Updates job (SEC_Monitor + Rights_Offering_Monitor) rather than at ~1am. Diagnosis on 2026-10-12: that feed is healthy — the last offering (Rent the Runway, 2026-10-07) was ingested and tasked; the Oct 8-9 ROM runs correctly skipped every filing as not a rights offering. The 'stopped' symptom was silence on quiet days.
+
+Also fixed: `ingest_orchestrator.run_cycle` returned as soon as Gmail ingest raised, so no action profile ran while ingest was failing. Action profiles read records already in the database (the rights-offering records are written by another system, not Gmail), so they now run regardless, and the heartbeat reports the ingest failure.
+
+Not established: why no rights-offering tasks were created. The trigger needs records with `source_type = 'SEC_Edgar_rights_offering'` and `enrichment_status = 'complete'`, written by a process outside this repository. The first heartbeat shows whether that feed is writing records and whether they reach `complete`.
+
 ## 2026-10-11 - Trash LinkedIn job alerts after export
 
 **Type**: feature

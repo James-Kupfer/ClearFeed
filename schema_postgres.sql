@@ -90,6 +90,16 @@ CREATE TABLE IF NOT EXISTS ActionRuns (
 
 CREATE INDEX IF NOT EXISTS ix_action_run_profile ON ActionRuns (profile_name, created_at DESC);
 
+-- HeartbeatRuns: one row per (profile, US-Central day) so an action profile's
+-- daily "the process ran" Todoist task is created once per day. Also created on
+-- first use by db.claim_heartbeat, so existing databases need no migration.
+CREATE TABLE IF NOT EXISTS HeartbeatRuns (
+    profile_name VARCHAR(100) NOT NULL,
+    run_date     DATE         NOT NULL,
+    created_at   TIMESTAMP    NOT NULL DEFAULT (now() AT TIME ZONE 'America/Chicago'),
+    PRIMARY KEY (profile_name, run_date)
+);
+
 -- SourceDocuments: full original source text, retained untruncated. 1:1 with
 -- ContentRecords (shared primary key). Kept in a separate table so the large raw
 -- blobs (Postgres TOAST-compresses them out-of-line) never widen the hot

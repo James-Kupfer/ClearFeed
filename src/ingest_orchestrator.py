@@ -64,6 +64,7 @@ def run_cycle(dry_run: bool = False) -> None:
         log.exception("[run_cycle] Token health check failed (non-fatal)")
 
     # Stage 1 — Gmail ingest
+    ingest_error: str | None = None
     if orch.get("gmail_ingest", True):
         log.info("[run_cycle] Stage 1: Starting Gmail ingest...")
         try:
@@ -85,9 +86,13 @@ def run_cycle(dry_run: bool = False) -> None:
                 duplicate,
                 trashed,
             )
-        except Exception:
-            log.exception("[run_cycle] ✗ FATAL: run_ingest() raised exception")
-            return
+        except Exception as exc:
+            # Action profiles read records already in the DB (some are written by
+            # other systems, not Gmail), so a Gmail failure must not skip them.
+            log.exception(
+                "[run_cycle] ✗ run_ingest() raised exception — continuing to action profiles"
+            )
+            ingest_error = f"Gmail ingest failed this cycle: {type(exc).__name__}: {exc}"
     else:
         log.info(
             "[run_cycle] Stage 1: Gmail ingest disabled in orchestration config — skipping."
@@ -102,7 +107,7 @@ def run_cycle(dry_run: bool = False) -> None:
     for profile_path in action_profiles:
         log.info("Running action profile: %s", profile_path)
         try:
-            action_results = run_action(profile_path)
+            action_results = run_action(profile_path, cycle_note=ingest_error)
             created = sum(1 for r in action_results if r.status == "created")
             skipped = sum(1 for r in action_results if r.status == "skipped")
             failed = sum(1 for r in action_results if r.status == "failed")

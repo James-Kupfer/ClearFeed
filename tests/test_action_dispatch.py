@@ -908,3 +908,217 @@ def test_create_task_sends_inverted_priority(requests_mock):
 
     sent_body = _json.loads(requests_mock.last_request.body)
     assert sent_body["priority"] == 4
+
+
+# ---------------------------------------------------------------------------
+# Daily heartbeat
+# ---------------------------------------------------------------------------
+
+
+def _heartbeat_profile_file(tmp_path, heartbeat=None):
+    base = yaml.safe_load(_minimal_profile())
+    base["heartbeat"] = heartbeat or {
+        "project": "Business",
+        "content": "Check {date}: {headline}",
+        "priority": 4,
+        "alert_priority": 1,
+        "stats_sql": "SELECT 7 AS records_total",
+    }
+    p = tmp_path / "profile.yaml"
+    p.write_text(yaml.dump(base))
+    return p
+
+
+def _run_with_heartbeat(
+    tmp_path,
+    *,
+    claimed=True,
+    trigger_result=None,
+    trigger_error=None,
+    stats_error=None,
+    create_result=("task-1", None),
+    cycle_note=None,
+):
+    """Run run_action with every external dependency mocked; return the mocks."""
+    import action_dispatch
+    from db import DbError
+
+    def fake_query_sql(sql, *a, **k):
+        if "records_total" in sql:
+            if stats_error:
+                raise DbError(stats_error)
+            return [{"records_total": 7}]
+        if trigger_error:
+            raise DbError(trigger_error)
+        return trigger_result or []
+
+    with patch("action_dispatch.query_sql", side_effect=fake_query_sql), \
+         patch("action_dispatch.claim_heartbeat", return_value=claimed) as claim, \
+         patch("action_dispatch.release_heartbeat") as release, \
+         patch("action_dispatch.TodoistClient"), \
+         patch("action_dispatch.LLMClient"), \
+         patch("action_dispatch._action_one") as action_one, \
+         patch("action_dispatch._insert_action_run"), \
+         patch("action_dispatch._create_todoist_task", return_value=create_result) as create:
+        action_one.side_effect = lambda rec, *a: action_dispatch.ActionResult(rec["id"], "created", "t")
+        results = action_dispatch.run_action(
+            _heartbeat_profile_file(tmp_path), cycle_note=cycle_note
+        )
+    return results, claim, release, create
+
+
+def test_load_profile_accepts_heartbeat(tmp_path):
+    from action_dispatch import _load_profile
+
+    assert "heartbeat" in _load_profile(_heartbeat_profile_file(tmp_path))
+
+
+@pytest.mark.parametrize("missing", ["project", "content"])
+def test_load_profile_heartbeat_requires_project_and_content(tmp_path, missing):
+    from action_dispatch import _load_profile
+
+    hb = {"project": "Business", "content": "x"}
+    del hb[missing]
+    with pytest.raises(ValueError, match=missing):
+        _load_profile(_heartbeat_profile_file(tmp_path, hb))
+
+
+def test_real_rights_offering_profile_loads():
+    from pathlib import Path
+    from action_dispatch import _load_profile
+
+    profile = _load_profile(
+        Path(__file__).parent.parent / "profiles" / "task_rights_offering.yaml"
+    )
+    assert profile["heartbeat"]["stats_sql"]
+
+
+def test_heartbeat_sent_when_no_records_found(tmp_path):
+    results, claim, _, create = _run_with_heartbeat(tmp_path)
+    assert results == []
+    claim.assert_called_once_with("test_profile")
+    payload = create.call_args[0][0]
+    assert "no new records" in payload["content"]
+    assert payload["priority"] == 4
+    assert "records_total: 7" in payload["description"]
+    assert "**Status:** OK" in payload["description"]
+
+
+def test_heartbeat_reports_created_tasks(tmp_path):
+    _, _, _, create = _run_with_heartbeat(
+        tmp_path, trigger_result=[{"id": 1}, {"id": 2}]
+    )
+    payload = create.call_args[0][0]
+    assert "2 task(s) created" in payload["content"]
+    assert payload["priority"] == 4
+
+
+def test_heartbeat_sent_and_escalated_when_trigger_query_fails(tmp_path):
+    results, _, _, create = _run_with_heartbeat(tmp_path, trigger_error="boom")
+    assert results == []
+    payload = create.call_args[0][0]
+    assert "NEEDS ATTENTION" in payload["content"]
+    assert payload["priority"] == 1
+    assert "boom" in payload["description"]
+
+
+def test_heartbeat_escalated_when_a_record_failed(tmp_path):
+    import action_dispatch
+
+    failed = action_dispatch.ActionResult(9, "failed", error="LLM error: x")
+    with patch("action_dispatch.query_sql", side_effect=lambda sql, *a, **k: [{"records_total": 1}] if "records_total" in sql else [{"id": 9}]), \
+         patch("action_dispatch.claim_heartbeat", return_value=True), \
+         patch("action_dispatch.TodoistClient"), patch("action_dispatch.LLMClient"), \
+         patch("action_dispatch._insert_action_run"), \
+         patch("action_dispatch._action_one", return_value=failed), \
+         patch("action_dispatch._create_todoist_task", return_value=("t", None)) as create:
+        action_dispatch.run_action(_heartbeat_profile_file(tmp_path))
+    payload = create.call_args[0][0]
+    assert payload["priority"] == 1
+    assert "#9 LLM error: x" in payload["description"]
+
+
+def test_heartbeat_includes_cycle_note_and_escalates(tmp_path):
+    _, _, _, create = _run_with_heartbeat(tmp_path, cycle_note="Gmail ingest failed this cycle")
+    payload = create.call_args[0][0]
+    assert payload["priority"] == 1
+    assert "Gmail ingest failed this cycle" in payload["description"]
+
+
+def test_heartbeat_stats_failure_is_reported_not_fatal(tmp_path):
+    _, _, _, create = _run_with_heartbeat(tmp_path, stats_error="no such table")
+    payload = create.call_args[0][0]
+    assert payload["priority"] == 1
+    assert "Feed stats query failed" in payload["description"]
+
+
+def test_heartbeat_not_created_when_already_claimed_today(tmp_path):
+    _, _, _, create = _run_with_heartbeat(tmp_path, claimed=False)
+    create.assert_not_called()
+
+
+def test_heartbeat_claim_released_when_task_creation_fails(tmp_path):
+    _, _, release, _ = _run_with_heartbeat(tmp_path, create_result=(None, "Todoist down"))
+    release.assert_called_once_with("test_profile")
+
+
+def test_heartbeat_sent_when_processing_raises_and_exception_propagates(tmp_path):
+    import action_dispatch
+
+    with patch("action_dispatch.query_sql", side_effect=lambda sql, *a, **k: [{"records_total": 1}] if "records_total" in sql else [{"id": 1}]), \
+         patch("action_dispatch.claim_heartbeat", return_value=True), \
+         patch("action_dispatch.TodoistClient"), \
+         patch("action_dispatch.LLMClient", side_effect=RuntimeError("no api key")), \
+         patch("action_dispatch._create_todoist_task", return_value=("t", None)) as create:
+        with pytest.raises(RuntimeError, match="no api key"):
+            action_dispatch.run_action(_heartbeat_profile_file(tmp_path))
+    payload = create.call_args[0][0]
+    assert payload["priority"] == 1
+    assert "no api key" in payload["description"]
+
+
+def test_profile_without_heartbeat_never_claims(tmp_path):
+    import action_dispatch
+
+    p = tmp_path / "profile.yaml"
+    p.write_text(_minimal_profile())
+    with patch("action_dispatch.query_sql", return_value=[]), \
+         patch("action_dispatch.claim_heartbeat") as claim:
+        action_dispatch.run_action(p)
+    claim.assert_not_called()
+
+
+def test_orchestrator_runs_action_profiles_when_ingest_raises():
+    import ingest_orchestrator
+
+    with patch.object(ingest_orchestrator, "_load_orchestration_config",
+                      return_value={"gmail_ingest": True, "post_ingest_actions": ["profiles/x.yaml"]}), \
+         patch.object(ingest_orchestrator, "check_token_expiration", return_value=None), \
+         patch.object(ingest_orchestrator, "run_ingest", side_effect=RuntimeError("gmail down")), \
+         patch.object(ingest_orchestrator, "run_action", return_value=[]) as run_action:
+        ingest_orchestrator.run_cycle()
+    run_action.assert_called_once()
+    assert "gmail down" in run_action.call_args.kwargs["cycle_note"]
+
+
+def test_heartbeat_waits_until_after_hour(tmp_path):
+    from datetime import datetime
+    import action_dispatch
+    hb = {"project": "Business", "content": "Check {date}", "after_hour": 20}
+    for hour, expect_sent in ((19, False), (20, True)):
+        with patch("action_dispatch.now_cst", return_value=datetime(2026, 10, 12, hour, 30)), \
+             patch("action_dispatch.query_sql", return_value=[]), \
+             patch("action_dispatch.claim_heartbeat", return_value=True) as claim, \
+             patch("action_dispatch.TodoistClient"), \
+             patch("action_dispatch._create_todoist_task", return_value=("t", None)) as create:
+            action_dispatch.run_action(_heartbeat_profile_file(tmp_path, hb))
+        assert claim.called is expect_sent
+        assert create.called is expect_sent
+
+
+@pytest.mark.parametrize("bad", [24, -1, "20"])
+def test_load_profile_heartbeat_rejects_bad_after_hour(tmp_path, bad):
+    from action_dispatch import _load_profile
+    hb = {"project": "Business", "content": "x", "after_hour": bad}
+    with pytest.raises(ValueError, match="after_hour"):
+        _load_profile(_heartbeat_profile_file(tmp_path, hb))
