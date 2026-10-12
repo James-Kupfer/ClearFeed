@@ -1099,3 +1099,26 @@ def test_orchestrator_runs_action_profiles_when_ingest_raises():
         ingest_orchestrator.run_cycle()
     run_action.assert_called_once()
     assert "gmail down" in run_action.call_args.kwargs["cycle_note"]
+
+
+def test_heartbeat_waits_until_after_hour(tmp_path):
+    from datetime import datetime
+    import action_dispatch
+    hb = {"project": "Business", "content": "Check {date}", "after_hour": 20}
+    for hour, expect_sent in ((19, False), (20, True)):
+        with patch("action_dispatch.now_cst", return_value=datetime(2026, 10, 12, hour, 30)), \
+             patch("action_dispatch.query_sql", return_value=[]), \
+             patch("action_dispatch.claim_heartbeat", return_value=True) as claim, \
+             patch("action_dispatch.TodoistClient"), \
+             patch("action_dispatch._create_todoist_task", return_value=("t", None)) as create:
+            action_dispatch.run_action(_heartbeat_profile_file(tmp_path, hb))
+        assert claim.called is expect_sent
+        assert create.called is expect_sent
+
+
+@pytest.mark.parametrize("bad", [24, -1, "20"])
+def test_load_profile_heartbeat_rejects_bad_after_hour(tmp_path, bad):
+    from action_dispatch import _load_profile
+    hb = {"project": "Business", "content": "x", "after_hour": bad}
+    with pytest.raises(ValueError, match="after_hour"):
+        _load_profile(_heartbeat_profile_file(tmp_path, hb))

@@ -40,6 +40,8 @@ todoist:
 # any rights offering was found, and even if the run errored. It confirms this
 # profile ran and shows the state of the upstream feed. Priority is raised to P1
 # when the run failed, so a quiet day (P4) is distinguishable from a broken one.
+# after_hour: SEC Updates (SEC_Monitor then Rights_Offering_Monitor) runs weekdays at
+# 19:00 CT, so the heartbeat waits until the first cycle after 20:00 CT to report on it.
 # not_complete counts feed records that never reached enrichment_status='complete'
 # (the trigger above ignores them).
 heartbeat:
@@ -47,6 +49,7 @@ heartbeat:
   section: "Rights Offerings"
   content: "Rights offering check {date}: {headline}"
   priority: 4
+  after_hour: 20
   alert_priority: 1
   labels:
     - clearfeed

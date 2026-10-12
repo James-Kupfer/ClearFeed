@@ -55,6 +55,7 @@ YAML profile schema:
       section: "Rights Offerings"  # optional
       content: "Rights offering check {date}: {headline}"  # {date} {headline}
       priority: 4            # normal-day priority (default 4)
+      after_hour: 20         # optional: don't send before this US-Central hour (so the task reflects upstream jobs that run earlier that day)
       alert_priority: 1      # used when the run errored/failed or the cycle reported a problem (default 1)
       labels: [clearfeed]
       due_string: "today"
@@ -216,6 +217,9 @@ def _validate_heartbeat(profile: dict) -> None:
     for field in ("project", "content"):
         if not cfg.get(field):
             raise ValueError(f"Profile heartbeat section missing required field: {field!r}")
+    after_hour = cfg.get("after_hour", 0)
+    if not isinstance(after_hour, int) or not 0 <= after_hour <= 23:
+        raise ValueError("Profile heartbeat 'after_hour' must be an integer 0-23")
     stats_sql = cfg.get("stats_sql")
     if stats_sql is not None and not isinstance(stats_sql, str):
         raise ValueError("Profile heartbeat 'stats_sql' must be a string")
@@ -941,6 +945,8 @@ def _send_heartbeat(
     the next cycle retries.
     """
     name = profile["name"]
+    if now_cst().hour < profile["heartbeat"].get("after_hour", 0):
+        return
     try:
         if not claim_heartbeat(name):
             return

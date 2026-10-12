@@ -244,6 +244,7 @@ heartbeat:
   section: "Rights Offerings"                        # optional
   content: "Rights offering check {date}: {headline}" # {date}, {headline}
   priority: 4
+  after_hour: 20      # optional: not before this US-Central hour
   alert_priority: 1
   labels: [clearfeed]
   due_string: "today"
