@@ -14,7 +14,7 @@ After the switch to Haiku 5.5, thematic and macro theses were tagged `actionable
 - Close calls are withheld. The rationale must name the missing element.
 - Added worked example 8 (ETF named as a vehicle, `actionable` withheld).
 
-Not changed: worked examples 4-7 still qualify under (a)-(c). Not verified against the model: no record was re-classified. Run `reprocess` on the five examples after the next ingest cycle.
+Not verified against the model: no record was re-classified. Run `reprocess` on the five examples after the next ingest cycle.
 
 ## 2026-10-12 - Shorter task titles for Review and Meeting connection tasks
 
