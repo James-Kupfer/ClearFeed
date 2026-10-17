@@ -30,11 +30,11 @@ Choose 5–20, most-relevant first (fewer only if genuinely thin). Lowercase, un
 Some tags describe *handling/delivery*, not subject, and never count toward labels: the handling tag `actionable` and the format tags `newsletter`, `digest`, `alert`, `notification`, `news`, `document`.
 
 `actionable` — place first when it applies: the summary describes a specific, executable action the reader is being asked to take. Met by any of:
-- a financial/trading signal directed at the reader as a genuine, independently verifiable trade idea — options/leaps/puts/calls with a named ticker, or a named ticker plus a direction, price target, entry, or stop;
+- a financial/trading signal directed at the reader as a genuine, independently verifiable trade idea that is executable from the summary alone AND time-critical — the entry opportunity or trade thesis resolves, changes, or disappears within 5 calendar days of the item's date, so a reader who waits loses the price. Both parts are required. The window may be stated (a dated catalyst, vote, event, expiry, or entry window) or implied. Implied time-critical cases: (i) a trade the author discloses as made now (today or this week) in a named instrument with a price, premium, or size, held short-term or for a few weeks — a purchase, a sale, or an exit whose replacement is not yet named; (ii) a stated buy/sell zone or trigger price near the current price ("buy up to $140" with the stock at $138), where the opportunity vanishes if the price moves; (iii) an options position bought at a specific price (premium, strike, or limit). Executable means (a) options/leaps/puts/calls with a named underlying plus a strike, expiry, or entry price; (b) a named tradeable security plus a direction AND at least one trade parameter (price target, entry/valuation, stop, dated catalyst, trigger price); or (c) the author's own newly disclosed position in a named instrument, stated as the direct payoff of the item's thesis or as a short-term trade. Timing of disclosures: a bare holding ("I own X", "we hold X") is not a trade and is never `actionable` — it gives no entry date, price, or holding period. A present-tense action ("I am selling Y", "I'm buying Z") may imply a current trade; decide from the surrounding context. Treat it as time-critical when the context shows the action is happening now (this week, a stated price, a near-term catalyst, a short-term framing), and withhold when the context frames it as part of a long-term or structural allocation, or gives no sign of when. Further cases. Actionable: a stop or exit-level change on a position, stated with prices and made now; a conditional trigger with a stated level near the current price and a stated window ("if SPX closes below 5,000 this week, short" with the index at 5,020; a far-away trigger is not); an options position at a specific price tied to an event, even when the catalyst is weeks out, unless the author frames it as long-term. Not actionable: a valuation or price-target call with no entry trigger or catalyst; intent without a trade ("I like the setup but haven't traded it"); an entry from weeks ago recapped with its gain; a third-party position or filing (a 13F, another investor's stake); a current purchase the author frames as a hold through a cycle or multi-year. Time-critical test: if the idea would read the same a week later, it is not `actionable`. Not time-critical: a position the author frames as long-term (including long-dated LEAPS held as a long-term bet), a multi-month or multi-year allocation, a structural theme, or a stale entry with no current price relevance;
 - an event invitation with a specific date requiring attendance or RSVP;
 - any other concrete task, decision, reply, or deadline directed at the reader.
 - a LinkedIn connection request ("I want to connect").
-Do NOT apply to commentary, subscription requests (example: to a substack), opinion, or FYI material that asks nothing of the reader. Do NOT apply to promotional materials, guides, or training the reader is directed to download or access. Hard override: a job posting or recruitment outreach is NEVER `actionable`, regardless of any deadline, application step, or call to apply it contains. Hard override: a security vulnerability disclosure or patch notification is NEVER `actionable`, regardless of any urgency, remediation step, or update instruction it contains. Hard override: unverifiable or promotional securities promotion is NEVER `actionable`. If the signal arrives in marketing, sponsored, paid-promotion, or stock-tout content, or names a ticker/target the reader cannot independently verify (anonymous or undisclosed-sponsor recommendation, hype/pump framing, "guaranteed"/"next 10x" language), withhold `actionable` regardless of any ticker, direction, price target, entry, or stop it cites — even when the item keeps a topical Investment label.
+Do NOT apply to commentary, subscription requests (example: to a substack), opinion, or FYI material that asks nothing of the reader. A ticker makes a trade idea only when the trade itself is the item's recommendation, meets (a), (b), or (c) above, and has a stated or implied window within 5 calendar days. Multi-month or "long-term" allocations, structural themes, and "multi-year" views are never time-critical, however specific the ticker. When the trade parameters are missing or the call is close, withhold `actionable`. Do NOT apply to promotional materials, guides, or training the reader is directed to download or access. Hard override: a job posting or recruitment outreach is NEVER `actionable`, regardless of any deadline, application step, or call to apply it contains. Hard override: a security vulnerability disclosure or patch notification is NEVER `actionable`, regardless of any urgency, remediation step, or update instruction it contains. Hard override: unverifiable or promotional securities promotion is NEVER `actionable`. If the signal arrives in marketing, sponsored, paid-promotion, or stock-tout content, or names a ticker/target the reader cannot independently verify (anonymous or undisclosed-sponsor recommendation, hype/pump framing, "guaranteed"/"next 10x" language), withhold `actionable` regardless of any ticker, direction, price target, entry, or stop it cites — even when the item keeps a topical Investment label.
 </tags>
 
 <labels>
@@ -92,7 +92,7 @@ Score certainty in the LABELS (tags secondary), integer 1–5. Be conservative �
 
 <rationale>
 One string, hard max 1000 characters, written before the labels as the reasoning they follow from. Cover, in order, concretely:
-(1) Actionable — state explicitly whether `actionable` was applied and why: name the trigger met (financial signal, dated invitation/RSVP, or other directed task/deadline), or the reason it was withheld (FYI/commentary, the job-posting hard override, or the promotional/unverifiable-promotion hard override).
+(1) Actionable — state explicitly whether `actionable` was applied and why: name the trigger met (financial signal, dated invitation/RSVP, or other directed task/deadline), or the reason it was withheld (FYI/commentary, the job-posting hard override, or the promotional/unverifiable-promotion hard override). For a financial item, name the missing element when withheld (no ticker recommended, no entry/target/stop/catalyst, no stated or implied window within 5 days).
 (2) Tags — justify the tags assigned, grouped by subject area; name the content in the summary that each group rests on. Note any invented (off-registry) tags and why.
 (3) Labels — for each label, name the supporting tag cluster (purpose signals first: Spam, InMail, personal framing); state why each subject label cleared the cluster test and why any plausible label was withheld (sub-threshold, purpose-governed, etc.).
 (4) Borderline calls — any close decision and why it landed as it did.
@@ -102,7 +102,7 @@ Poor: "It's a tech newsletter so it's Technology."
 </rationale>
 
 <worked_examples>
-Six end-to-end examples anchoring the boundary rules above. Each shows the reasoning and the exact JSON that should follow.
+End-to-end examples anchoring the boundary rules above. Each shows the reasoning and the exact JSON that should follow.
 
 Example 1 — Business vs. Politics, market/analytical framing wins.
 Reasoning: geopolitical and energy-market content framed around hydrocarbon flows and source-evaluation methodology, not civic/governmental news — Business per the Business vs Politics boundary rule, with a secondary method/epistemology tag cluster. No directed action for the reader — commentary and analysis only, actionable withheld.
@@ -175,7 +175,7 @@ Reasoning: a government-account confirmation link with a 24-hour deadline is the
 ```
 
 Example 4 — Investment actionable, named ticker plus a specific catalyst and valuation entry.
-Reasoning: a value-focused newsletter names a specific ticker, cites a cash-yield figure and a dated catalyst (rights offering vote), and frames it as a trade the reader can independently underwrite from the disclosed numbers — meets the "named ticker plus a direction, price target, entry, or stop" trigger. Not promotional (no sponsor disclosure, no hype language, figures are sourced to filings) so the promotional-securities hard override does not apply.
+Reasoning: a value-focused newsletter names a specific ticker, cites a cash-yield figure and a dated catalyst (rights offering vote in three days), and frames it as a trade the reader can independently underwrite from the disclosed numbers — meets the "named ticker plus a direction and entry/valuation" trigger, and the vote inside the 5-day window makes it time-critical. Not promotional (no sponsor disclosure, no hype language, figures are sourced to filings) so the promotional-securities hard override does not apply.
 ```json
 {
   "tags": [
@@ -188,7 +188,7 @@ Reasoning: a value-focused newsletter names a specific ticker, cites a cash-yiel
     "cash_flow",
     "trade_alert"
   ],
-  "classification_rationale": "Actionable: applied. The newsletter names a specific small-cap ticker trading at an 8% free-cash-flow yield ahead of a shareholder vote on a rights offering, with the author disclosing an existing long position and a stated view that the offering terms are cheap relative to the sponsor's own recent open-market buys. Named ticker plus a specific entry rationale and dated catalyst meets the financial-signal trigger; no promotional or hard-override signal (sourced to the company's own filings, no sponsor disclosure, no hype language, author discloses their own position). Tags: special_situations, equity, activist, rights_offering (the corporate-action mechanics), valuation, cash_flow (the entry rationale), trade_alert (format). No invented tags. Labels: Business from the dominant investment-thesis cluster; no purpose signals.",
+  "classification_rationale": "Actionable: applied. The newsletter names a specific small-cap ticker trading at an 8% free-cash-flow yield ahead of a shareholder vote on a rights offering in three days, with the author disclosing an existing long position and a stated view that the offering terms are cheap relative to the sponsor's own recent open-market buys. Named ticker plus a specific entry rationale and dated catalyst meets the financial-signal trigger; no promotional or hard-override signal (sourced to the company's own filings, no sponsor disclosure, no hype language, author discloses their own position). Tags: special_situations, equity, activist, rights_offering (the corporate-action mechanics), valuation, cash_flow (the entry rationale), trade_alert (format). No invented tags. Labels: Business from the dominant investment-thesis cluster; no purpose signals.",
   "labels": [
     "Business"
   ],
@@ -197,7 +197,7 @@ Reasoning: a value-focused newsletter names a specific ticker, cites a cash-yiel
 ```
 
 Example 5 — Investment actionable, options structure with named ticker, strike, and expiry.
-Reasoning: a technical/derivatives newsletter proposes a specific options structure — named index, strike, and expiry — as a hedge against a dated catalyst (an FOMC decision). This is the clearest form of the "options/leaps/puts/calls with a named ticker" trigger; the structure is independently verifiable (any reader can quote the same strike) and carries no promotional framing.
+Reasoning: a technical/derivatives newsletter proposes a specific options structure — named index, strike, and expiry — as a hedge against a dated catalyst (an FOMC decision two days out, options expiring that Friday). This is the clearest form of the "options/leaps/puts/calls with a named ticker" trigger; the structure is independently verifiable (any reader can quote the same strike) and carries no promotional framing.
 ```json
 {
   "tags": [
@@ -209,7 +209,7 @@ Reasoning: a technical/derivatives newsletter proposes a specific options struct
     "risk_management",
     "trade_alert"
   ],
-  "classification_rationale": "Actionable: applied. The author recommends buying out-of-the-money index puts at a named strike expiring the week of the upcoming FOMC meeting, sized as a portfolio hedge, with the current premium and breakeven level quoted. Named instrument plus strike and expiry meets the options trigger explicitly called out in the actionable rule; no hard override applies (not a stock tout, no sponsor, no unverifiable ticker). Tags: options, macro, rates (the FOMC/rates driver), technical_analysis (the strike/level selection method), risk_management (framed as a hedge, not speculation), trade_alert (format). No invented tags. Labels: Business from the derivatives/macro-positioning cluster; no purpose signals.",
+  "classification_rationale": "Actionable: applied. The author recommends buying out-of-the-money index puts at a named strike expiring this Friday, two days after the FOMC decision, sized as a portfolio hedge, with the current premium and breakeven level quoted. Named instrument plus strike and expiry meets the options trigger explicitly called out in the actionable rule; no hard override applies (not a stock tout, no sponsor, no unverifiable ticker). Tags: options, macro, rates (the FOMC/rates driver), technical_analysis (the strike/level selection method), risk_management (framed as a hedge, not speculation), trade_alert (format). No invented tags. Labels: Business from the derivatives/macro-positioning cluster; no purpose signals.",
   "labels": [
     "Business"
   ],
@@ -218,7 +218,7 @@ Reasoning: a technical/derivatives newsletter proposes a specific options struct
 ```
 
 Example 6 — Investment actionable, first-person trade disclosure embedded in a broader thesis piece.
-Reasoning: the bulk of the piece is analytical (a structural argument about customer concentration in a supply chain), but the author discloses their own new short position in a named, tradeable index as the payoff of that argument. The disclosure is a genuine action taken by the author, not just news about someone else's position (contrast: a Google Alert reporting what a well-known investor did elsewhere is not actionable — no directed signal, just third-party news) — so it clears the bar even though it is one sentence inside a longer commentary piece.
+Reasoning: the bulk of the piece is analytical (a structural argument about customer concentration in a supply chain), but the author discloses their own new short position in a named, tradeable index as the payoff of that argument, timed to the key customer's earnings report two days out. The disclosure is a genuine action taken by the author, not just news about someone else's position (contrast: a Google Alert reporting what a well-known investor did elsewhere is not actionable — no directed signal, just third-party news) — so it clears the bar even though it is one sentence inside a longer commentary piece.
 ```json
 {
   "tags": [
@@ -230,7 +230,7 @@ Reasoning: the bulk of the piece is analytical (a structural argument about cust
     "trading",
     "newsletter"
   ],
-  "classification_rationale": "Actionable: applied. Most of the piece is structural commentary on customer concentration risk in a chip supply chain, but the author states they are short a named semiconductor index as a direct expression of that thesis. A named, tradeable instrument plus a stated direction from the author's own book meets the financial-signal trigger, even though it is embedded in a longer analytical piece rather than the sole subject — the trigger is the disclosed position, not the surrounding commentary. Distinguish from a third-party news digest merely reporting that some investor holds a similar view elsewhere, which stays commentary. Tags: semiconductor, supply_chain (the structural thesis), short_position, risk_management, trading (the disclosed action), newsletter (format). No invented tags. Labels: Business from the investment-thesis cluster; no purpose signals.",
+  "classification_rationale": "Actionable: applied. Most of the piece is structural commentary on customer concentration risk in a chip supply chain, but the author states they are short a named semiconductor index as a direct expression of that thesis, ahead of the key customer's earnings report in two days. A named, tradeable instrument plus a stated direction from the author's own book, with a catalyst inside the 5-day window, meets the financial-signal trigger (without the near-term catalyst the same disclosure would stay commentary), even though it is embedded in a longer analytical piece rather than the sole subject — the trigger is the disclosed position. A third-party news digest merely reporting another investor's view stays commentary. Tags: semiconductor, supply_chain (the structural thesis), short_position, risk_management, trading (the disclosed action), newsletter (format). No invented tags. Labels: Business from the investment-thesis cluster; no purpose signals.",
   "labels": [
     "Business"
   ],
@@ -253,7 +253,122 @@ Reasoning: the email covers four distinct named-ticker situations, each with a s
     "subscription_pitch",
     "newsletter"
   ],
-  "classification_rationale": "Actionable: applied. Two of four covered situations name a ticker plus a price target or explicit valuation entry (an equity-comp price-hurdle grant read as a bullish target; a value-fund-cited litigation price target with a dated post-trial hearing) — meets the financial-signal trigger. Not withheld by the promotional-securities override: figures are sourced to filings/court dates, not sponsor-disclosed hype. Tags: equity, special_situations, activist, event_driven, executive_changes, value (the four situations' mechanics and theses); subscription_pitch (a 'upgrade to our paid tier' CTA appended near the end); newsletter (format). No invented tags. Labels: Spam considered and rejected — per the Spam dominance test, the four specific, sourced theses are the bulk of the content; the subscription CTA is incidental monetization, not the email's purpose, so it does not out-weigh the substantive analysis. Business from the dominant investment-thesis cluster; no purpose signals.",
+  "classification_rationale": "Actionable: applied. Two of four covered situations name a ticker plus a price target or explicit valuation entry (an equity-comp price-hurdle grant read as a bullish target; a value-fund-cited litigation price target with a post-trial hearing later this week) — meets the financial-signal trigger; the hearing inside the 5-day window makes the litigation situation time-critical, while the comp-grant read alone has no window and would not qualify. Not withheld by the promotional-securities override: figures are sourced to filings/court dates, not sponsor-disclosed hype. Tags: equity, special_situations, activist, event_driven, executive_changes, value (the four situations); subscription_pitch (an 'upgrade to our paid tier' CTA near the end); newsletter (format). No invented tags. Labels: Spam rejected — the four sourced theses are the bulk of the content and the CTA is incidental monetization. Business from the dominant investment-thesis cluster; no purpose signals.",
+  "labels": [
+    "Business"
+  ],
+  "classification_confidence": 4
+}
+```
+
+Example 8 — thematic thesis with ETFs named as vehicles, actionable withheld.
+Reasoning: the summary argues a sector/flow thesis and names two ETFs as the author's preferred vehicle, but gives no entry, target, stop, or catalyst, and no short window — the re-rating is multi-year. The tickers are vehicles for a theme, not a time-critical trade the reader can execute from the summary.
+```json
+{
+  "tags": [
+    "emerging_markets",
+    "equity",
+    "etf",
+    "macro",
+    "rotation",
+    "dollar",
+    "newsletter"
+  ],
+  "classification_rationale": "Actionable withheld: no executable, time-critical trade. The summary argues emerging-market equities are early in a re-rating on Asian surplus and Chinese financing flows, and names a preferred high-yield EM ETF over the broad one. Missing: any entry, price target, stop, or dated catalyst, and any window inside 5 days (a multi-year re-rating is never time-critical). A named ETF as the preferred vehicle for a theme is not an executable, time-critical trade idea. Tags: emerging_markets, equity, etf (the thesis and vehicles); macro, rotation, dollar (the capital-flow driver); newsletter (format). No invented tags. Labels: Business from the dominant macro/markets cluster; no purpose signals.",
+  "labels": [
+    "Business"
+  ],
+  "classification_confidence": 4
+}
+```
+
+Example 9 — Investment actionable, short-term stock position disclosed with an entry price.
+Reasoning: the author discloses buying a named stock today at a stated price and plans to hold for a few weeks. The entry is fresh and priced, so the opportunity is time-critical even though the hold runs past five days; the window is the entry, not the hold. No promotional framing.
+```json
+{
+  "tags": [
+    "actionable",
+    "equity",
+    "trading",
+    "trade_alert",
+    "newsletter"
+  ],
+  "classification_rationale": "Actionable: applied. The author states they bought 500 shares of a named small-cap today at $42 and plan to hold for a few weeks. Named ticker, entry price, direction, and a short-term horizon meet the financial-signal trigger; the fresh entry means the price is likely to move before a reader acts, so the item is time-critical. No hard override applies (no sponsor, no hype language). Tags: equity, trading, trade_alert (the disclosed trade); newsletter (format). No invented tags. Labels: Business from the trading cluster; no purpose signals.",
+  "labels": [
+    "Business"
+  ],
+  "classification_confidence": 4
+}
+```
+
+Example 10 — Options with a premium, actionable withheld because the author frames the bet as long-term.
+Reasoning: the author discloses long-dated calls with a strike and premium, which would normally qualify as an options position at a specific price. But the author frames it explicitly as a long-term bet on a multi-year roadmap, with an expiry more than a year out, so there is no near-term window: the idea reads the same a week later.
+```json
+{
+  "tags": [
+    "options",
+    "equity",
+    "ai_product",
+    "newsletter"
+  ],
+  "classification_rationale": "Actionable withheld: not time-critical. The author discloses Jan 2028 calls on a named company at a stated strike and premium, but frames them as a long-term bet on a multi-year product roadmap. The expiry is more than a year out and the thesis would read the same a week later, so no stated or implied window within 5 days. Tags: options, equity (the position); ai_product (the thesis subject); newsletter (format). No invented tags. Labels: Business from the options/equity cluster; Technology withheld, one incidental tag.",
+  "labels": [
+    "Business"
+  ],
+  "classification_confidence": 4
+}
+```
+
+Example 11 — Investment actionable, named sale this week with the replacement not yet named.
+Reasoning: the author discloses selling all of a named ETF this week to move into a different basket they will name later. The sale is a complete, priced-in-time action on a named instrument; the unnamed replacement does not remove it. The sale was made this week, so the window is immediate.
+```json
+{
+  "tags": [
+    "actionable",
+    "etf",
+    "precious_metals",
+    "trading",
+    "newsletter"
+  ],
+  "classification_rationale": "Actionable: applied. The author states they sold their entire position in a named gold-miners ETF this week and will move into a different gold basket to be named in a follow-up. A named instrument, a direction (sell), and a fresh disclosed trade meet the financial-signal trigger; the sale was this week, so the window is immediate. The unnamed replacement does not make the sale non-executable. Tags: etf, precious_metals (the instrument and sector); trading (the disclosed action); newsletter (format). No invented tags. Labels: Business from the trading/commodity cluster; no purpose signals.",
+  "labels": [
+    "Business"
+  ],
+  "classification_confidence": 3
+}
+```
+
+Example 12 — Holding statement and a present-tense sale judged from context, actionable withheld.
+Reasoning: the author says they own a named fund and are selling another to fund a new allocation, but the surrounding text frames everything as a sizeable long-term reallocation with no price, date, or catalyst. A bare holding gives no entry or holding period, and the sale's context is long-term, so there is no current window.
+```json
+{
+  "tags": [
+    "etf",
+    "precious_metals",
+    "portfolio_construction",
+    "newsletter"
+  ],
+  "classification_rationale": "Actionable withheld: not time-critical. The author says they own a named gold ETF and are selling another named ETF to fund a different basket, within a long-term reallocation thesis. A bare holding carries no entry date, price, or holding period; the present-tense sale carries no price, date, or catalyst, and the surrounding context is long-term. Contrast a sale described as made this week or at a stated price, which would qualify. Tags: etf, precious_metals (the instruments and sector); portfolio_construction (the reallocation framing); newsletter (format). No invented tags. Labels: Business from the markets cluster; no purpose signals.",
+  "labels": [
+    "Business"
+  ],
+  "classification_confidence": 3
+}
+```
+
+Example 13 — Investment actionable, conditional trigger near the current price with a stated window.
+Reasoning: the author gives a trigger level, a stop, and a window for the week, and the index is already close to the trigger. The opportunity depends on the next few days of price action, so it is time-critical even though no trade has been executed yet.
+```json
+{
+  "tags": [
+    "actionable",
+    "options",
+    "technical_analysis",
+    "risk_management",
+    "trade_alert",
+    "newsletter"
+  ],
+  "classification_rationale": "Actionable: applied. The author states a conditional short on a named index if it closes below 5,000 this week, with a stop at 5,060, and the index is at 5,020. A named instrument, direction, trigger level, stop, and a stated one-week window near the current price meet the financial-signal trigger; the opportunity disappears if the level is not hit this week. No hard override applies. Tags: options, technical_analysis (the level-based setup); risk_management (the stop); trade_alert (format); newsletter (format). No invented tags. Labels: Business from the trading cluster; no purpose signals.",
   "labels": [
     "Business"
   ],
