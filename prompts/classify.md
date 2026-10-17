@@ -30,11 +30,11 @@ Choose 5–20, most-relevant first (fewer only if genuinely thin). Lowercase, un
 Some tags describe *handling/delivery*, not subject, and never count toward labels: the handling tag `actionable` and the format tags `newsletter`, `digest`, `alert`, `notification`, `news`, `document`.
 
 `actionable` — place first when it applies: the summary describes a specific, executable action the reader is being asked to take. Met by any of:
-- a financial/trading signal directed at the reader as a genuine, independently verifiable trade idea — options/leaps/puts/calls with a named ticker, or a named ticker plus a direction, price target, entry, or stop;
+- a financial/trading signal directed at the reader as a genuine, independently verifiable trade idea that is executable from the summary alone — (a) options/leaps/puts/calls with a named underlying plus a strike or expiry; (b) a named tradeable security plus a direction AND at least one trade parameter (price target, entry/valuation, stop, dated catalyst); or (c) the author's own newly disclosed position in a named instrument, stated as the direct payoff of the item's thesis;
 - an event invitation with a specific date requiring attendance or RSVP;
 - any other concrete task, decision, reply, or deadline directed at the reader.
 - a LinkedIn connection request ("I want to connect").
-Do NOT apply to commentary, subscription requests (example: to a substack), opinion, or FYI material that asks nothing of the reader. Do NOT apply to promotional materials, guides, or training the reader is directed to download or access. Hard override: a job posting or recruitment outreach is NEVER `actionable`, regardless of any deadline, application step, or call to apply it contains. Hard override: a security vulnerability disclosure or patch notification is NEVER `actionable`, regardless of any urgency, remediation step, or update instruction it contains. Hard override: unverifiable or promotional securities promotion is NEVER `actionable`. If the signal arrives in marketing, sponsored, paid-promotion, or stock-tout content, or names a ticker/target the reader cannot independently verify (anonymous or undisclosed-sponsor recommendation, hype/pump framing, "guaranteed"/"next 10x" language), withhold `actionable` regardless of any ticker, direction, price target, entry, or stop it cites — even when the item keeps a topical Investment label.
+Do NOT apply to commentary, subscription requests (example: to a substack), opinion, or FYI material that asks nothing of the reader. Hard override: thesis commentary is NEVER `actionable`. A macro, capital-flow, sector, or thematic thesis ("X is a multi-year beneficiary", "EM is early in a re-rating", "warrants a sizeable allocation", "supports continued yield pressure") is commentary even when it implies a direction and even when a ticker or ETF appears as a vehicle, a preferred or "alternative" fund, a comparison, or supporting evidence (a price, yield, or drawdown). A ticker makes a trade idea only when the trade itself is the item's recommendation and meets (a), (b), or (c) above. Also commentary, even with a ticker and direction: an item that updates, confirms, or challenges a prior thesis or action; weighs evidence for and against; or calls its own premise unresolved, disputed, or "the author's framework, not data"; and a position change that depends on a leg the summary leaves open (a sale to fund a basket "not yet identified", a "follow-up piece will cover it"), because the reader cannot execute it. When the trade parameters are missing or the call is close, withhold `actionable`. Do NOT apply to promotional materials, guides, or training the reader is directed to download or access. Hard override: a job posting or recruitment outreach is NEVER `actionable`, regardless of any deadline, application step, or call to apply it contains. Hard override: a security vulnerability disclosure or patch notification is NEVER `actionable`, regardless of any urgency, remediation step, or update instruction it contains. Hard override: unverifiable or promotional securities promotion is NEVER `actionable`. If the signal arrives in marketing, sponsored, paid-promotion, or stock-tout content, or names a ticker/target the reader cannot independently verify (anonymous or undisclosed-sponsor recommendation, hype/pump framing, "guaranteed"/"next 10x" language), withhold `actionable` regardless of any ticker, direction, price target, entry, or stop it cites — even when the item keeps a topical Investment label.
 </tags>
 
 <labels>
@@ -92,7 +92,7 @@ Score certainty in the LABELS (tags secondary), integer 1–5. Be conservative �
 
 <rationale>
 One string, hard max 1000 characters, written before the labels as the reasoning they follow from. Cover, in order, concretely:
-(1) Actionable — state explicitly whether `actionable` was applied and why: name the trigger met (financial signal, dated invitation/RSVP, or other directed task/deadline), or the reason it was withheld (FYI/commentary, the job-posting hard override, or the promotional/unverifiable-promotion hard override).
+(1) Actionable — state explicitly whether `actionable` was applied and why: name the trigger met (financial signal, dated invitation/RSVP, or other directed task/deadline), or the reason it was withheld (FYI/commentary, the thesis-commentary hard override, the job-posting hard override, or the promotional/unverifiable-promotion hard override). For a financial item, name the missing element when withheld (no ticker recommended, no entry/target/stop/catalyst, open leg, or unresolved premise).
 (2) Tags — justify the tags assigned, grouped by subject area; name the content in the summary that each group rests on. Note any invented (off-registry) tags and why.
 (3) Labels — for each label, name the supporting tag cluster (purpose signals first: Spam, InMail, personal framing); state why each subject label cleared the cluster test and why any plausible label was withheld (sub-threshold, purpose-governed, etc.).
 (4) Borderline calls — any close decision and why it landed as it did.
@@ -102,7 +102,7 @@ Poor: "It's a tech newsletter so it's Technology."
 </rationale>
 
 <worked_examples>
-Six end-to-end examples anchoring the boundary rules above. Each shows the reasoning and the exact JSON that should follow.
+End-to-end examples anchoring the boundary rules above. Each shows the reasoning and the exact JSON that should follow.
 
 Example 1 — Business vs. Politics, market/analytical framing wins.
 Reasoning: geopolitical and energy-market content framed around hydrocarbon flows and source-evaluation methodology, not civic/governmental news — Business per the Business vs Politics boundary rule, with a secondary method/epistemology tag cluster. No directed action for the reader — commentary and analysis only, actionable withheld.
@@ -254,6 +254,27 @@ Reasoning: the email covers four distinct named-ticker situations, each with a s
     "newsletter"
   ],
   "classification_rationale": "Actionable: applied. Two of four covered situations name a ticker plus a price target or explicit valuation entry (an equity-comp price-hurdle grant read as a bullish target; a value-fund-cited litigation price target with a dated post-trial hearing) — meets the financial-signal trigger. Not withheld by the promotional-securities override: figures are sourced to filings/court dates, not sponsor-disclosed hype. Tags: equity, special_situations, activist, event_driven, executive_changes, value (the four situations' mechanics and theses); subscription_pitch (a 'upgrade to our paid tier' CTA appended near the end); newsletter (format). No invented tags. Labels: Spam considered and rejected — per the Spam dominance test, the four specific, sourced theses are the bulk of the content; the subscription CTA is incidental monetization, not the email's purpose, so it does not out-weigh the substantive analysis. Business from the dominant investment-thesis cluster; no purpose signals.",
+  "labels": [
+    "Business"
+  ],
+  "classification_confidence": 4
+}
+```
+
+Example 8 — thematic thesis with ETFs named as vehicles, actionable withheld.
+Reasoning: the summary argues a sector/flow thesis and names two ETFs as the author's preferred vehicle, but gives no entry, target, stop, or catalyst, and says the underlying flow premise is disputed and unresolved. The tickers are vehicles for a theme, not a trade the reader can execute from the summary — the thesis-commentary hard override applies.
+```json
+{
+  "tags": [
+    "emerging_markets",
+    "equity",
+    "etf",
+    "macro",
+    "rotation",
+    "dollar",
+    "newsletter"
+  ],
+  "classification_rationale": "Actionable withheld: thesis-commentary hard override. The summary argues emerging-market equities are early in a re-rating on Asian surplus and Chinese financing flows, and names a preferred high-yield EM ETF over the broad one. Missing: any entry, price target, stop, or dated catalyst; the author's own framework is stated as not data and the flow premise is called disputed and unresolved. A named ETF as the preferred vehicle for a theme is not an executable trade idea. Tags: emerging_markets, equity, etf (the thesis and vehicles); macro, rotation, dollar (the capital-flow driver); newsletter (format). No invented tags. Labels: Business from the dominant macro/markets cluster; no purpose signals.",
   "labels": [
     "Business"
   ],

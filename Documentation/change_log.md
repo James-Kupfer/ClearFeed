@@ -1,5 +1,19 @@
 # Change Log
 
+## 2026-10-17 - Tighten `actionable` for thesis commentary
+
+**Type**: fix
+**Files**: prompts/classify.md
+
+After the switch to Haiku 5.5, thematic and macro theses were tagged `actionable` and fed `task_investment`. Five reviewed examples (China Treasury exit update, AI-capex strain, gold/GDXJ, coal and oil services, EM re-rating) share one pattern: a directional thesis, with a ticker or ETF appearing only as a vehicle, a "preferred" or "alternative" fund, or evidence, and no complete trade.
+
+- The investment trigger now requires an executable trade: (a) options with a named underlying plus strike or expiry; (b) a named security plus a direction and at least one of price target, entry/valuation, stop, or dated catalyst; or (c) the author's own newly disclosed position stated as the thesis payoff (worked example 6 is unchanged).
+- New hard override: thesis commentary is never `actionable`. It covers macro, flow, sector, and thematic theses even when a ticker is named; items that update or challenge a prior thesis or call their own premise unresolved or disputed; and position changes that depend on an unnamed or unpublished leg.
+- Close calls are withheld. The rationale must name the missing element.
+- Added worked example 8 (ETF named as a vehicle, `actionable` withheld).
+
+Not changed: worked examples 4-7 still qualify under (a)-(c). Not verified against the model: no record was re-classified. Run `reprocess` on the five examples after the next ingest cycle.
+
 ## 2026-10-12 - Shorter task titles for Review and Meeting connection tasks
 
 **Type**: change
