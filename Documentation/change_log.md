@@ -9,6 +9,8 @@ After the switch to Haiku 5.5, thematic and macro theses were tagged `actionable
 
 - The investment trigger now requires an executable trade: (a) options with a named underlying plus strike or expiry; (b) a named security plus a direction and at least one of price target, entry/valuation, stop, or dated catalyst; or (c) the author's own newly disclosed position stated as the thesis payoff (worked example 6 is unchanged).
 - New hard override: thesis commentary is never `actionable`. It covers macro, flow, sector, and thematic theses even when a ticker is named; items that update or challenge a prior thesis or call their own premise unresolved or disputed; and position changes that depend on an unnamed or unpublished leg.
+- **Time-critical requirement (added same day, at the user's direction).** `actionable` also requires that the trade thesis resolves or changes, or the opportunity disappears, within 5 calendar days of the item's date (dated catalyst, vote, event, expiry, or entry window). "Would it read the same a week later" means not actionable. None of the five reviewed examples had a window; long-term allocations and multi-year themes are now explicitly excluded.
+- Worked examples 4-7 were edited to state a catalyst inside the window (vote in three days, options expiring Friday, earnings in two days, hearing this week). Examples 6 and 7 changed substance: example 6's disclosed short is now timed to a near-term earnings report, and in example 7 only the litigation situation qualifies, not the comp-grant read.
 - Close calls are withheld. The rationale must name the missing element.
 - Added worked example 8 (ETF named as a vehicle, `actionable` withheld).
 
