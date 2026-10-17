@@ -30,7 +30,7 @@ Choose 5–20, most-relevant first (fewer only if genuinely thin). Lowercase, un
 Some tags describe *handling/delivery*, not subject, and never count toward labels: the handling tag `actionable` and the format tags `newsletter`, `digest`, `alert`, `notification`, `news`, `document`.
 
 `actionable` — place first when it applies: the summary describes a specific, executable action the reader is being asked to take. Met by any of:
-- a financial/trading signal directed at the reader as a genuine, independently verifiable trade idea that is executable from the summary alone AND time-critical — the entry opportunity or trade thesis resolves, changes, or disappears within 5 calendar days of the item's date, so a reader who waits loses the price. Both parts are required. The window may be stated (a dated catalyst, vote, event, expiry, or entry window) or implied. Implied time-critical cases: (i) a trade the author discloses as made now (today or this week) in a named instrument with a price, premium, or size, held short-term or for a few weeks — a purchase, a sale, or an exit whose replacement is not yet named; (ii) a stated buy/sell zone or trigger price near the current price ("buy up to $140" with the stock at $138), where the opportunity vanishes if the price moves; (iii) an options position bought at a specific price (premium, strike, or limit). Executable means (a) options/leaps/puts/calls with a named underlying plus a strike, expiry, or entry price; (b) a named tradeable security plus a direction AND at least one trade parameter (price target, entry/valuation, stop, dated catalyst, trigger price); or (c) the author's own newly disclosed position in a named instrument, stated as the direct payoff of the item's thesis or as a short-term trade. Time-critical test: if the idea would read the same a week later, it is not `actionable`. Not time-critical: a position the author frames as long-term (including long-dated LEAPS held as a long-term bet), a multi-month or multi-year allocation, a structural theme, or a stale entry with no current price relevance;
+- a financial/trading signal directed at the reader as a genuine, independently verifiable trade idea that is executable from the summary alone AND time-critical — the entry opportunity or trade thesis resolves, changes, or disappears within 5 calendar days of the item's date, so a reader who waits loses the price. Both parts are required. The window may be stated (a dated catalyst, vote, event, expiry, or entry window) or implied. Implied time-critical cases: (i) a trade the author discloses as made now (today or this week) in a named instrument with a price, premium, or size, held short-term or for a few weeks — a purchase, a sale, or an exit whose replacement is not yet named; (ii) a stated buy/sell zone or trigger price near the current price ("buy up to $140" with the stock at $138), where the opportunity vanishes if the price moves; (iii) an options position bought at a specific price (premium, strike, or limit). Executable means (a) options/leaps/puts/calls with a named underlying plus a strike, expiry, or entry price; (b) a named tradeable security plus a direction AND at least one trade parameter (price target, entry/valuation, stop, dated catalyst, trigger price); or (c) the author's own newly disclosed position in a named instrument, stated as the direct payoff of the item's thesis or as a short-term trade. Timing of disclosures: a bare holding ("I own X", "we hold X") is not a trade and is never `actionable` — it gives no entry date, price, or holding period. A present-tense action ("I am selling Y", "I'm buying Z") may imply a current trade; decide from the surrounding context. Treat it as time-critical when the context shows the action is happening now (this week, a stated price, a near-term catalyst, a short-term framing), and withhold when the context frames it as part of a long-term or structural allocation, or gives no sign of when. Time-critical test: if the idea would read the same a week later, it is not `actionable`. Not time-critical: a position the author frames as long-term (including long-dated LEAPS held as a long-term bet), a multi-month or multi-year allocation, a structural theme, or a stale entry with no current price relevance;
 - an event invitation with a specific date requiring attendance or RSVP;
 - any other concrete task, decision, reply, or deadline directed at the reader.
 - a LinkedIn connection request ("I want to connect").
@@ -331,6 +331,24 @@ Reasoning: the author discloses selling all of a named ETF this week to move int
     "newsletter"
   ],
   "classification_rationale": "Actionable: applied. The author states they sold their entire position in a named gold-miners ETF this week and will move into a different gold basket to be named in a follow-up. A named instrument, a direction (sell), and a fresh disclosed trade meet the financial-signal trigger; the sale was this week, so the window is immediate. The unnamed replacement does not make the sale non-executable. Tags: etf, precious_metals (the instrument and sector); trading (the disclosed action); newsletter (format). No invented tags. Labels: Business from the trading/commodity cluster; no purpose signals.",
+  "labels": [
+    "Business"
+  ],
+  "classification_confidence": 3
+}
+```
+
+Example 12 — Holding statement and a present-tense sale judged from context, actionable withheld.
+Reasoning: the author says they own a named fund and are selling another to fund a new allocation, but the surrounding text frames everything as a sizeable long-term reallocation with no price, date, or catalyst. A bare holding gives no entry or holding period, and the sale's context is long-term, so there is no current window.
+```json
+{
+  "tags": [
+    "etf",
+    "precious_metals",
+    "portfolio_construction",
+    "newsletter"
+  ],
+  "classification_rationale": "Actionable withheld: not time-critical. The author says they own a named gold ETF and are selling another named ETF to fund a different basket, within a long-term reallocation thesis. A bare holding carries no entry date, price, or holding period; the present-tense sale carries no price, date, or catalyst, and the surrounding context is long-term. Contrast a sale described as made this week or at a stated price, which would qualify. Tags: etf, precious_metals (the instruments and sector); portfolio_construction (the reallocation framing); newsletter (format). No invented tags. Labels: Business from the markets cluster; no purpose signals.",
   "labels": [
     "Business"
   ],
