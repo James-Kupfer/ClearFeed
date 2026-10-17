@@ -30,7 +30,7 @@ Choose 5–20, most-relevant first (fewer only if genuinely thin). Lowercase, un
 Some tags describe *handling/delivery*, not subject, and never count toward labels: the handling tag `actionable` and the format tags `newsletter`, `digest`, `alert`, `notification`, `news`, `document`.
 
 `actionable` — place first when it applies: the summary describes a specific, executable action the reader is being asked to take. Met by any of:
-- a financial/trading signal directed at the reader as a genuine, independently verifiable trade idea that is executable from the summary alone AND time-critical — the trade thesis resolves, changes, or the opportunity disappears within 5 calendar days of the item's date. Both parts are required. The window may be stated (a dated catalyst, vote, event, expiry, or entry window) or implied by the trade itself: a position the author says they bought or sold as a short-term trade or hold, or an options position bought at a specific price (premium, strike, or limit), is time-critical because the price is likely to move rapidly. Executable means (a) options/leaps/puts/calls with a named underlying plus a strike, expiry, or entry price; (b) a named tradeable security plus a direction AND at least one trade parameter (price target, entry/valuation, stop, dated catalyst); or (c) the author's own newly disclosed position in a named instrument, stated as the direct payoff of the item's thesis or as a short-term trade. Time-critical test: if the idea would read the same a week later, it is not `actionable`. No stated or implied short window (a long-term or multi-month hold, a structural theme) means not time-critical;
+- a financial/trading signal directed at the reader as a genuine, independently verifiable trade idea that is executable from the summary alone AND time-critical — the entry opportunity or trade thesis resolves, changes, or disappears within 5 calendar days of the item's date, so a reader who waits loses the price. Both parts are required. The window may be stated (a dated catalyst, vote, event, expiry, or entry window) or implied. Implied time-critical cases: (i) a trade the author discloses as made now (today or this week) in a named instrument with a price, premium, or size, held short-term or for a few weeks — a purchase, a sale, or an exit whose replacement is not yet named; (ii) a stated buy/sell zone or trigger price near the current price ("buy up to $140" with the stock at $138), where the opportunity vanishes if the price moves; (iii) an options position bought at a specific price (premium, strike, or limit). Executable means (a) options/leaps/puts/calls with a named underlying plus a strike, expiry, or entry price; (b) a named tradeable security plus a direction AND at least one trade parameter (price target, entry/valuation, stop, dated catalyst, trigger price); or (c) the author's own newly disclosed position in a named instrument, stated as the direct payoff of the item's thesis or as a short-term trade. Time-critical test: if the idea would read the same a week later, it is not `actionable`. Not time-critical: a position the author frames as long-term (including long-dated LEAPS held as a long-term bet), a multi-month or multi-year allocation, a structural theme, or a stale entry with no current price relevance;
 - an event invitation with a specific date requiring attendance or RSVP;
 - any other concrete task, decision, reply, or deadline directed at the reader.
 - a LinkedIn connection request ("I want to connect").
@@ -279,6 +279,62 @@ Reasoning: the summary argues a sector/flow thesis and names two ETFs as the aut
     "Business"
   ],
   "classification_confidence": 4
+}
+```
+
+Example 9 — Investment actionable, short-term stock position disclosed with an entry price.
+Reasoning: the author discloses buying a named stock today at a stated price and plans to hold for a few weeks. The entry is fresh and priced, so the opportunity is time-critical even though the hold runs past five days; the window is the entry, not the hold. No promotional framing.
+```json
+{
+  "tags": [
+    "actionable",
+    "equity",
+    "trading",
+    "trade_alert",
+    "newsletter"
+  ],
+  "classification_rationale": "Actionable: applied. The author states they bought 500 shares of a named small-cap today at $42 and plan to hold for a few weeks. Named ticker, entry price, direction, and a short-term horizon meet the financial-signal trigger; the fresh entry means the price is likely to move before a reader acts, so the item is time-critical. No hard override applies (no sponsor, no hype language). Tags: equity, trading, trade_alert (the disclosed trade); newsletter (format). No invented tags. Labels: Business from the trading cluster; no purpose signals.",
+  "labels": [
+    "Business"
+  ],
+  "classification_confidence": 4
+}
+```
+
+Example 10 — Options with a premium, actionable withheld because the author frames the bet as long-term.
+Reasoning: the author discloses long-dated calls with a strike and premium, which would normally qualify as an options position at a specific price. But the author frames it explicitly as a long-term bet on a multi-year roadmap, with an expiry more than a year out, so there is no near-term window: the idea reads the same a week later.
+```json
+{
+  "tags": [
+    "options",
+    "equity",
+    "ai_product",
+    "newsletter"
+  ],
+  "classification_rationale": "Actionable withheld: not time-critical. The author discloses Jan 2028 calls on a named company at a stated strike and premium, but frames them as a long-term bet on a multi-year product roadmap. The expiry is more than a year out and the thesis would read the same a week later, so no stated or implied window within 5 days. Tags: options, equity (the position); ai_product (the thesis subject); newsletter (format). No invented tags. Labels: Business from the options/equity cluster; Technology withheld, one incidental tag.",
+  "labels": [
+    "Business"
+  ],
+  "classification_confidence": 4
+}
+```
+
+Example 11 — Investment actionable, named sale this week with the replacement not yet named.
+Reasoning: the author discloses selling all of a named ETF this week to move into a different basket they will name later. The sale is a complete, priced-in-time action on a named instrument; the unnamed replacement does not remove it. The sale was made this week, so the window is immediate.
+```json
+{
+  "tags": [
+    "actionable",
+    "etf",
+    "precious_metals",
+    "trading",
+    "newsletter"
+  ],
+  "classification_rationale": "Actionable: applied. The author states they sold their entire position in a named gold-miners ETF this week and will move into a different gold basket to be named in a follow-up. A named instrument, a direction (sell), and a fresh disclosed trade meet the financial-signal trigger; the sale was this week, so the window is immediate. The unnamed replacement does not make the sale non-executable. Tags: etf, precious_metals (the instrument and sector); trading (the disclosed action); newsletter (format). No invented tags. Labels: Business from the trading/commodity cluster; no purpose signals.",
+  "labels": [
+    "Business"
+  ],
+  "classification_confidence": 3
 }
 ```
 
